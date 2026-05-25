@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Eye, Download, ExternalLink, FileText, Maximize2, Minimize2, CheckCircle2, FileCode, Clock, Loader2, AlertCircle, RotateCcw } from "lucide-react";
 import { useAppSettings } from "@/hooks/useAppSettings";
 
@@ -31,6 +31,27 @@ export default function Preview({
 }: PreviewProps) {
   const { t, language } = useAppSettings();
   const [copied, setCopied] = useState(false);
+  const [progress, setProgress] = useState(0);
+
+  useEffect(() => {
+    if (status === "processing" || status === "pending") {
+      setProgress(5);
+      const interval = setInterval(() => {
+        setProgress((prev) => {
+          if (prev >= 92) {
+            return prev;
+          }
+          const increment = prev < 50 ? 8 : prev < 75 ? 4 : 1.5;
+          return Math.min(prev + increment, 95);
+        });
+      }, 250);
+      return () => clearInterval(interval);
+    } else if (status === "completed") {
+      setProgress(100);
+    } else {
+      setProgress(0);
+    }
+  }, [status]);
 
   const handleCopyLogs = () => {
     if (errorMessage) {
@@ -45,7 +66,7 @@ export default function Preview({
   const isHTML = ["html", "html5", "revealjs", "slidy", "slideous", "s5", "dzslides"].includes(
     outputFormat || ""
   );
-  
+
   const canPreview = (isPDF || isHTML) && outputUrl;
 
   return (
@@ -143,9 +164,7 @@ export default function Preview({
               <div className="skeleton h-8 w-full mt-3" />
             </div>
             <div className="progress-bar w-48">
-              <div className="progress-bar-fill progress-bar-indeterminate" style={{ width: "30%" }}>
-                <div className="h-full bg-gradient-to-r from-[#818cf8] to-[#a78bfa] animate-[progress-indeterminate_1.2s_ease-in-out_infinite]" style={{ width: "100%" }} />
-              </div>
+              <div className="progress-bar-fill" style={{ width: `${progress}%` }} />
             </div>
           </div>
         )}
@@ -263,7 +282,7 @@ export default function Preview({
                 <div className="space-y-2">
                   <h2 className="text-xs font-bold text-black tracking-widest uppercase">1. Introduction</h2>
                   <p className="text-[11px] text-neutral-800 leading-relaxed font-serif">
-                    {language === "tr" 
+                    {language === "tr"
                       ? "Kuantum hesaplama, klasik bilgisayarların çözmekte yetersiz kaldığı karmaşık problemleri çözmek için kuantum mekaniği ilkelerini kullanan yeni nesil bir hesaplama paradigmasıdır."
                       : "Quantum computing is a next-generation computing paradigm that utilizes quantum mechanics principles to solve complex problems that are intractable for classical computers."}
                   </p>
@@ -312,7 +331,7 @@ export default function Preview({
                 <span className="font-semibold text-[var(--foreground)]">{t("preview_success_msg")}</span>
               </div>
               {outputUrl && (
-                <a 
+                <a
                   href={outputUrl}
                   download={`compiled_document.${outputFormat === "beamer" || outputFormat === "pdf" ? "pdf" : outputFormat}`}
                   className="btn-primary py-2 px-4 text-[10px] flex items-center gap-1.5 rounded-lg"

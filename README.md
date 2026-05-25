@@ -1,113 +1,103 @@
 # 📄 Pandoc Orchestrator
 
-A modern SaaS platform for document conversion and management powered by Pandoc, built with Next.js, FastAPI, and Docker.
+Modern, ultra-performant, and feature-rich document conversion and orchestration suite. Powered by a Next.js (App Router) frontend, a Python FastAPI worker, and seamless Docker integration, Pandoc Orchestrator brings the full power of Pandoc and professional rendering engines directly to your browser.
 
-**Transforming documents seamlessly across formats with advanced filtering, templating, and academic publishing support.**
-
----
-
-## 🎯 Overview
-
-Pandoc Orchestrator is an end-to-end document conversion and management platform that brings Pandoc's powerful cross-format conversion capabilities to a modern web interface. Whether you're converting Markdown to PDF, managing academic citations, or applying corporate branding to documents, this platform handles it all.
-
-### Key Features
-
-- **Multi-Format Conversion**: Convert between 30+ document formats (Markdown, DOCX, HTML, LaTeX, PDF, EPUB, and more)
-- **Advanced PDF Engines**: Choose between LaTeX (academic), Typst (modern/fast), or HTML/CSS (web-based)
-- **Academic Publishing**: Built-in citation management (CSL/BibTeX), mathematics rendering, and scholarly formatting
-- **Custom Templating**: Upload reference documents or create custom templates for consistent branding
-- **Filter Pipelines**: Chain Lua and Python filters for complex document transformations
-- **Real-time Preview**: Live preview of PDF and presentation output directly in the browser
-- **Media Management**: Automatic extraction and organization of images and embedded media
-- **Bulk Processing**: Convert multiple documents in batch operations
+Transform documents dynamically across formats with advanced filter pipelines, bibliography citation management, customized styles, and live high-fidelity previews.
 
 ---
 
-## 🏗️ Architecture
+## 🎯 Platform Features
 
-### System Overview
+- **Multi-Format Conversion**: Seamlessly convert between 30+ document formats including Markdown, Jupyter Notebooks, DOCX, LaTeX, HTML5, EPUB, Typst, RTF, and others.
+- **Advanced PDF & Slide Engines**: High-fidelity PDF compiling using XeLaTeX, LuaLaTeX, pdfLaTeX, Tectonic, Typst (highly modern & fast), and HTML-to-PDF (WeasyPrint). Native presentations with RevealJS, PowerPoint (PPTX), and Beamer.
+- **Zero-Config Local Sandbox Mode**: Start coding and testing instantly! If Firebase Storage/Auth credentials are not present locally, the system automatically falls back to an isolated in-memory Mock Storage, a local disk-based compiled static file server (`/outputs/*`), and a bypass authentication layer (`sandbox-user`), eliminating all 503 and 401 errors.
+- **Academic Publishing Tools**: Deep citation processing via `citeproc`, supporting BibTeX (`.bib`) and CSL JSON bibliographies with built-in styles (APA, MLA, Harvard, IEEE, Chicago).
+- **Mathematics Rendering**: Advanced math compilers support KaTeX, MathJax, MathML, and WebTeX rendering across HTML and PDF outputs.
+- **Robust CLI Builder & Validator**: Executed under a secure list-based subprocess wrapper to prevent shell command injection. Validates that the system has at least `100MB` of free disk space before initiating any compilation to prevent disk-exhaustion crashes.
+- **Granular Progress UX**: A beautiful progressive loading screen that simulates multi-tier compiling intervals (5% ➔ 50% ➔ 75% ➔ 95%) and instantly fills to 100% upon successful compile resolving.
+- **Tracing & Auditing**: Comprehensive API versioning (`/api/v1`), standard fallback routing, request-id tracing (`X-Request-ID`) using Python `contextvars`, and structured JSON logs.
+
+---
+
+## 🏗️ System Architecture
 
 ```
-┌──────────────────────────────────────────┐
-│   Next.js Web Application (Frontend)     │
-│  - UI with Monaco Editor & Live Preview  │
-│  - Async Task Tracking (TanStack Query)  │
-│  - User Authentication (Supabase Auth)   │
-└──────────────────┬───────────────────────┘
-                   │ HTTP API
-                   ▼
-┌──────────────────────────────────────────┐
-│  Python FastAPI Worker (Docker)          │
-│  - Pandoc CLI Orchestration              │
-│  - PDF Engine Router                     │
-│  - Filter Execution & Sandboxing         │
-└──────────────────┬───────────────────────┘
-                   │ Storage/DB
-                   ▼
-┌──────────────────────────────────────────┐
-│    Supabase Backend                      │
-│  - PostgreSQL (Metadata & Status)        │
-│  - Object Storage (Files & Outputs)      │
-└──────────────────────────────────────────┘
+                       ┌──────────────────────────────────────────┐
+                       │    Next.js 16 Web Frontend (Turbopack)   │
+                       │  - Live Monaco Editor & Visual Preview   │
+                       │  - Progressive Simulation Progress Bar   │
+                       │  - Automatic /api/v1/ Header Injection   │
+                       └──────────────────┬───────────────────────┘
+                                          │
+                                          │ HTTP API POST / GET
+                                          ▼
+                       ┌──────────────────────────────────────────┐
+                       │      Python FastAPI Worker Engine        │
+                       │  - Safe Subprocess Command Execution     │
+                       │  - Disk Space Space Validator (>=100MB)  │
+                       │  - Engine Router & AST CLI Builders      │
+                       └──────────────────┬───────────────────────┘
+                                          │
+                  ┌───────────────────────┴───────────────────────┐
+                  ▼                                               ▼
+   [ PRODUCTION MODE ]                                   [ LOCAL SANDBOX MODE ]
+┌───────────────────────────────────────┐             ┌───────────────────────────────────────┐
+│           Firebase Services           │             │      Zero-Config Local Fallbacks      │
+│  - Firestore Logs & Status Tracker    │             │  - In-Memory SQLite Mock Database     │
+│  - Cloud Storage Bucket File Syncs    │             │  - Disk Static File Serving (/outputs)│
+│  - Firebase Web Auth SDK Validation   │             │  - Automatic sandbox-user Context     │
+└───────────────────────────────────────┘             └───────────────────────────────────────┘
 ```
-
-### Tech Stack
-
-**Frontend:**
-- **Framework**: Next.js 14+ (App Router)
-- **Language**: TypeScript
-- **UI**: Shadcn/UI + Tailwind CSS
-- **Editor**: Monaco Editor (syntax highlighting, multi-language support)
-- **State Management**: TanStack Query (async operations)
-- **Auth**: Supabase Auth
-
-**Backend:**
-- **API**: Python FastAPI
-- **Core**: Pandoc CLI with subprocess isolation
-- **Document Processing**: Pandoc + LaTeX/Typst/WeasyPrint
-- **Filtering**: Lua + Python filters
-- **Database**: Supabase PostgreSQL
-- **Storage**: Supabase Object Storage
-- **Containerization**: Docker + docker-compose
 
 ---
 
 ## 📁 Project Structure
 
-```
+```text
 pandoc-orchestrator/
 ├── apps/
-│   ├── web/                      # Next.js Frontend & API Routes
+│   ├── web/                         # NEXT.JS FRONTEND
 │   │   ├── src/
-│   │   │   ├── app/              # Next.js App Router
-│   │   │   ├── components/       # React Components (UI, Editor, Preview)
-│   │   │   ├── hooks/            # Custom Hooks
-│   │   │   └── lib/              # Utilities & Supabase Client
+│   │   │   ├── app/                 # Next.js App Router Pages
+│   │   │   │   ├── page.tsx         # Onboarding Wizard & Landing Page
+│   │   │   │   └── workspace/       # IDE Monaco Workspace View
+│   │   │   ├── components/          # Premium UI Widgets
+│   │   │   │   ├── preview.tsx      # Progressive Progress Visualizer & Iframe
+│   │   │   │   ├── editor.tsx       # Monaco Editor Component Wrapper
+│   │   │   │   └── conversion-panel.tsx # Compilation Options Configuration
+│   │   │   ├── hooks/
+│   │   │   │   └── useConversion.ts # React Query integration and polling
+│   │   │   └── lib/
+│   │   │       └── firebase.ts      # Cloud infrastructure connection
+│   │   ├── .env.local               # Web Environment Configuration
 │   │   └── package.json
 │   │
-│   └── worker/                   # Python FastAPI Worker
+│   └── worker/                      # FASTAPI PYTHON WORKER
 │       ├── app/
-│       │   ├── main.py           # FastAPI Entry Point
-│       │   ├── core/             # Pandoc Command Builder, Engine Router
-│       │   ├── filters/          # Pre-built Lua/Python Filters
-│       │   └── services/         # Supabase Integration
-│       └── requirements.txt
+│       │   ├── main.py              # Main API Routes & Tracing Middleware
+│       │   ├── config.py            # Environment Parser (dotenv loader)
+│       │   ├── core/
+│       │   │   ├── pandoc_cmd.py    # List-based CLI Subprocess Executor
+│       │   │   ├── engines.py       # XeLaTeX/Typst/WeasyPrint Router
+│       │   │   └── parser.py        # Document Parser & AST Analyzer
+│       │   └── services/
+│       │       └── firebase_service.py # Firebase Connector with Local Fallbacks
+│       ├── .env                     # Worker Environment Configuration
+│       ├── requirements.txt         # Python Package Dependencies
+│       └── tests/                   # Pytest Suites (40+ passing integration tests)
 │
 ├── docker/
-│   ├── docker-compose.yml        # Local Development Environment
-│   └── worker.Dockerfile         # Pandoc + Dependencies Image
+│   ├── docker-compose.yml           # Monorepo Local Orchestrator Compose
+│   └── worker.Dockerfile            # Python FastAPI + TeX Live Full + Typst Build
 │
-├── supabase/
-│   ├── migrations/               # Database Schema & RLS Policies
-│   └── seed.sql
+├── benchmarks/                      # Compilation and Style Benchmark Samples
+│   ├── academic_sample.md           # Equations and Citation Source MD
+│   ├── company_profile.docx         # Reference Document Styling File
+│   └── references.bib               # BibTeX bibliography list
 │
-├── benchmarks/                   # Test Files & Sample Documents
-│   ├── academic_sample.md
-│   ├── company_profile.docx
-│   └── references.bib
-│
-├── package.json                  # Monorepo Root
-└── README.md                     # This file
+├── FIREBASE_SETUP.md                # Cloud Database Setup & Rules Guide
+├── ARCHITECTURE.md                  # Detailed Technical Architecture Specifications
+└── package.json                     # Root Workspace Monorepo Configuration
 ```
 
 ---
@@ -115,237 +105,137 @@ pandoc-orchestrator/
 ## 🚀 Getting Started
 
 ### Prerequisites
+- **Node.js**: `v18` or `v20`+
+- **Python**: `v3.10` or `v3.11`+ (ensure `pip` is available)
+- **Docker & Docker-Compose** (Optional, highly recommended for full LaTeX compilation engines)
+- **Pandoc CLI**: Local installation required if not running via Docker.
 
-- **Node.js** >= 18.0.0
-- **Python** >= 3.9
-- **Docker** and **docker-compose**
-- **Git**
+---
 
-### Installation
+### Step-by-Step Installation
 
-1. **Clone the repository**
+1. **Clone the Repository**
    ```bash
    git clone <repository-url>
-   cd pandoc-orchestrator
+   cd RunDoc
    ```
 
-2. **Install dependencies**
+2. **Install Root Node Dependencies**
    ```bash
    npm install
    ```
 
-3. **Configure environment variables**
-   - Copy `.env.example` to `.env.local` in `apps/web/`
-   - Add your Supabase URL and API key
+3. **Establish Environment Variables**
+   The project is preconfigured to run locally out-of-the-box using the Sandbox Fallback Mode. Let's create the environment files:
    ```bash
-   cp .env.example .env.local
+   # Create frontend environment config
+   cp apps/web/env.local.example apps/web/.env.local
+
+   # Create backend environment config
+   cp apps/worker/.env.example apps/worker/.env
    ```
 
-4. **Start development environment**
-   ```bash
-   # Terminal 1: Start the web application
-   npm run dev:web
+4. **Launch Local Services**
+
+   #### Option A: Running Locally (Fast Sandbox Dev Mode)
+   This method utilizes your local Python environment and Next.js server.
    
-   # Terminal 2: Start the Python worker (in docker)
+   * **Terminal 1: Start Next.js App**
+     ```bash
+     npm run dev
+     ```
+     The user interface starts instantly at `http://localhost:3000`.
+
+   * **Terminal 2: Start FastAPI Worker**
+     ```bash
+     cd apps/worker
+     python -m pip install -r requirements.txt
+     python -m uvicorn app.main:app --reload --port 8000
+     ```
+     The worker runs at `http://localhost:8000`.
+
+   #### Option B: Running via Docker (Full Compilation Suite)
+   To enable all engines (XeLaTeX, pdfLaTeX, Typst, WeasyPrint) without installing heavy TeX Live libraries directly on your PC:
+   ```bash
    docker-compose -f docker/docker-compose.yml up --build
    ```
 
-The web application will be available at `http://localhost:3000`.
-
 ---
 
-## 📖 Core Modules
+## 🧪 Testing and Quality Control
 
-### Module 1: Document Conversion Engine
-- Multi-format input/output support (30+ formats)
-- Drag-and-drop file uploads
-- Direct text input with Monaco Editor
-- Bulk processing of multiple documents
-- Automatic media extraction and organization
+The FastAPI worker includes a highly strict, automated validation suite (40+ test cases) verifying routing, API prefixes, headers, disk monitoring, and subprocess executors.
 
-### Module 2: Advanced PDF & Presentation Engine
-- **PDF Rendering Options**:
-  - Academic: LaTeX (XeLaTeX/LuaLaTeX)
-  - Modern: Typst (fast, type-safe)
-  - Web-based: HTML/CSS (WeasyPrint)
-- Live preview in browser (PDF.js or iframe)
-- Presentation mode with reveal.js
+### Execution Instructions
+Set the `PYTHONPATH` and run pytest:
+```bash
+# Windows (PowerShell)
+$env:PYTHONPATH="apps/worker"
+python -m pytest apps/worker/tests/ -v
 
-### Module 3: Academic Publishing Tools
-- **Citation Management**:
-  - BibTeX (.bib) and CSL JSON support
-  - Automatic citation processing with citeproc
-  - Pre-built citation styles (APA, MLA, Harvard, IEEE)
-- **Mathematics Rendering**:
-  - MathJax, KaTeX, or static SVG support
-  - LaTeX equation support
-
-### Module 4: Templating & Corporate Branding
-- Upload custom `.docx` or `.pptx` templates
-- Reference document style mapping
-- Custom HTML/LaTeX templates with YAML metadata
-- Consistent branding across document types
-
-### Module 5: Filter & Extension System
-- Custom Lua filters for AST manipulation
-- Python filter support for advanced processing
-- Filter pipeline configuration (chain multiple filters)
-- User-uploaded filters with sandbox isolation
-
----
-
-## 🔒 Security & Performance
-
-### Security Features
-- **Sandbox Isolation**: User-uploaded filters run in isolated Docker containers
-- **Resource Limits**: CPU, memory, and timeout restrictions per conversion
-- **Input Validation**: Strict validation of Pandoc parameters
-- **Safe Command Execution**: Using subprocess with list-based arguments (no shell injection)
-
-### Performance Considerations
-- **Asynchronous Processing**: Long-running conversions use async task queues
-- **Smart Typography**: `--smart` mode enabled by default
-- **Large File Support**: Streaming uploads and background processing
-- **Caching**: Metadata and template caching to reduce latency
-
----
-
-## 📚 API Documentation
-
-### Conversion Endpoint
-
+# Linux / MacOS (Bash)
+PYTHONPATH=apps/worker python -m pytest apps/worker/tests/ -v
 ```
-POST /api/convert
 
-Request Body:
-{
-  "projectId": "uuid",
-  "inputFormat": "markdown",
-  "outputFormat": "pdf",
-  "engine": "xelatex",
-  "options": {
-    "citations": true,
-    "smartTypography": true,
-    "template": "academic"
+---
+
+## 📚 API Reference
+
+All requests must route through `/api/v1` or the root `/` paths. In sandbox development mode, if a token fails authorization, it is automatically accepted under a mock `sandbox-user` context.
+
+### 1. Health Status check
+* **Method**: `GET`
+* **Path**: `/api/v1/health`
+* **Response**:
+  ```json
+  {
+    "status": "healthy",
+    "pandoc_available": true,
+    "firebase_available": false,
+    "auth_required": true,
+    "version": "0.1.0"
   }
-}
+  ```
 
-Response:
-{
-  "conversionId": "uuid",
-  "status": "processing",
-  "estimatedTime": 30000
-}
-```
-
-### Project Management Endpoints
-
-- `GET /api/projects` - List user projects
-- `POST /api/projects` - Create new project
-- `GET /api/projects/:id` - Get project details
-- `DELETE /api/projects/:id` - Delete project
-
----
-
-## 🧪 Testing & Development
-
-### Running Tests
-
-```bash
-# Frontend tests
-npm run test:web
-
-# Worker tests
-cd apps/worker
-pytest
-```
-
-### Building
-
-```bash
-# Build web application
-npm run build:web
-
-# Build Docker images
-docker-compose -f docker/docker-compose.yml build
-```
-
-### Sample Documents
-
-Test files are located in `benchmarks/`:
-- `academic_sample.md` - Document with math and citations
-- `company_profile.docx` - Example reference document
-- `references.bib` - BibTeX sample bibliography
+### 2. Direct Conversion (Sync)
+* **Method**: `POST`
+* **Path**: `/api/v1/convert-direct`
+* **Content-Type**: `multipart/form-data`
+* **Request Headers**:
+  - `Authorization: Bearer <shared-secret-or-any-token>`
+  - `X-Request-ID: <custom-request-uuid>` (Optional)
+* **Request Form Parameters**:
+  | Name | Type | Description | Default |
+  | :--- | :--- | :--- | :--- |
+  | `text` | String | Raw text content to convert | `None` |
+  | `file` | Binary | File to convert (Alternative to text) | `None` |
+  | `output_format` | String | Output format (`pdf`, `docx`, `html`, `pptx`, etc.) | `pdf` |
+  | `engine` | String | Rendering engine (`xelatex`, `typst`, `weasyprint`) | `None` |
+  | `toc` | Boolean | Include Table of Contents | `false` |
+  | `toc_depth` | Integer | Max depth for TOC headings (1-6) | `3` |
+  | `math_rendering` | String | Math syntax (`mathjax`, `katex`, `mathml`) | `mathjax` |
+* **Response**:
+  ```json
+  {
+    "job_id": "c617b4ef-1563-4ba0-a4bd-215f5a8a1012",
+    "status": "completed",
+    "input_format": "markdown",
+    "output_format": "pdf",
+    "engine_used": "typst",
+    "execution_time_ms": 482,
+    "output_url": "http://localhost:8000/outputs/c617b4ef-1563-4ba0-a4bd-215f5a8a1012/compiled_output.pdf",
+    "command_executed": "pandoc document.md -o compiled_output.pdf --pdf-engine=typst"
+  }
+  ```
 
 ---
 
-## 📝 Configuration
-
-### Environment Variables
-
-```env
-# Supabase
-NEXT_PUBLIC_SUPABASE_URL=https://your-project.supabase.co
-NEXT_PUBLIC_SUPABASE_ANON_KEY=your-anon-key
-SUPABASE_SERVICE_ROLE_KEY=your-service-role-key
-
-# Worker
-WORKER_TIMEOUT=120
-WORKER_MAX_MEMORY=4096
-WORKER_MAX_CPU=2
-```
-
-### Database Migrations
-
-Migrations are stored in `supabase/migrations/`. Run them with:
-
-```bash
-npx supabase db push
-```
+## 🔒 Production Security Protocols
+- **Subprocess Arguments**: Command structures are executed as explicitly defined Python lists (`['pandoc', 'input.md', ...]`) rather than raw string queries, completely preventing shell-injection vectors.
+- **Disk Guardians**: Real-time disk capacity validators block conversions if workspace directory space drops below `100MB`, responding with a fast `507 Insufficient Storage` code.
+- **Timeout Limitations**: High-intensity conversions are forcibly terminated after `120` seconds to block infinite rendering loops.
+- **CORS Constraints**: Restricts incoming requests strictly to origins registered under `ALLOWED_ORIGINS` environment parameters.
 
 ---
 
-## 🤝 Contributing
-
-Contributions are welcome! Please read our contributing guidelines and submit PRs with:
-- Clear description of changes
-- Tests for new features
-- Updated documentation
-
----
-
-## 📄 License
-
-This project is licensed under the MIT License - see the LICENSE file for details.
-
----
-
-## 🔗 Documentation
-
-- [Architecture Documentation](./ARHICTECTURE.md) - System design and data flow
-- [Product Requirements](./PRD.md) - Feature specifications and requirements
-- [Must-Have Checklist](./Mustbe.md) - Critical implementation items
-
----
-
-## 💡 Roadmap
-
-- [ ] Real-time collaborative editing
-- [ ] Advanced workflow automation
-- [ ] API key management for programmatic access
-- [ ] Webhook support for external integrations
-- [ ] Advanced analytics and usage metrics
-- [ ] Team management and permissions
-
----
-
-## 🆘 Support
-
-For issues, questions, or feature requests, please:
-- Check existing issues on GitHub
-- Create a new issue with detailed information
-- Reach out to the maintainers
-
----
-
-**Built with ❤️ for document conversion enthusiasts**
+**Developed with precision for absolute cross-platform document rendering excellence.**

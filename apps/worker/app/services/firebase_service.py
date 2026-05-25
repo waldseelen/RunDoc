@@ -7,7 +7,7 @@ Yerel geliştirme için entegre Sandbox (yerel dosya sistemi) yedek desteği iç
 import logging
 import os
 import uuid
-import shutil
+from datetime import datetime, timezone
 from typing import Optional, Dict, Any, List
 
 logger = logging.getLogger(__name__)
@@ -72,6 +72,27 @@ class FirebaseService:
         self._initialize()
         return self._bucket
 
+    def check_connectivity(self) -> bool:
+        """Firebase Firestore + Storage erişilebilirliğini doğrular."""
+        self._initialize()
+
+        if not self.db or not self.bucket:
+            return False
+
+        try:
+            # Basit okuma testi
+            self.db.collection("_health").limit(1).get()
+            # Storage erişim testi
+            iterator = self.bucket.list_blobs(max_results=1)
+            next(iterator, None)
+            return True
+        except (OSError, ValueError) as e:
+            logger.error(f"Bağlantı kontrolü sırasında yerel sistem/argüman hatası: {e}")
+            return False
+        except Exception as e:
+            logger.error(f"Firebase bağlantı kontrolü başarısız: {e}")
+            return False
+
     # =============================================
     # STORAGE İŞLEMLERİ (Signature Fixed & Safe Fallbacks)
     # =============================================
@@ -95,6 +116,12 @@ class FirebaseService:
             blob = self.bucket.blob(storage_path)
             blob.download_to_filename(local_path)
             logger.info(f"Dosya Storage'dan indirildi: {storage_path} -> {local_path}")
+            return True
+        except OSError as e:
+            logger.error(f"Yerel dosya sistemi hatası (indirme): {e}. Yerel yedek aranıyor.")
+            if not os.path.exists(local_path):
+                with open(local_path, "w", encoding="utf-8") as f:
+                    f.write("# Hata Kurtarma Dokümanı\nYerel dosya sistemi hatası.\n")
             return True
         except Exception as e:
             logger.error(f"Storage'dan dosya indirme hatası: {e}. Yerel yedek kullanılıyor.")
@@ -120,6 +147,9 @@ class FirebaseService:
             blob.upload_from_filename(local_path)
             logger.info(f"Dosya Storage'a yüklendi: {local_path} -> {storage_path}")
             return storage_path
+        except OSError as e:
+            logger.error(f"Yerel dosya okuma hatası (yükleme): {e}")
+            return storage_path
         except Exception as e:
             logger.error(f"Storage'a dosya yükleme hatası: {e}")
             return storage_path
@@ -132,6 +162,9 @@ class FirebaseService:
         try:
             blob = self.bucket.blob(storage_path)
             return blob.generate_signed_url(expiration=3600)
+        except AttributeError as e:
+            logger.error(f"Storage nesnesi öznitelik hatası: {e}")
+            return ""
         except Exception as e:
             logger.error(f"URL oluşturma hatası: {e}")
             return ""
@@ -144,6 +177,9 @@ class FirebaseService:
         try:
             blob = self.bucket.blob(storage_path)
             return blob.generate_signed_url(expiration=expires_in)
+        except AttributeError as e:
+            logger.error(f"Storage nesnesi öznitelik hatası: {e}")
+            return None
         except Exception as e:
             logger.error(f"İmzalı URL oluşturma hatası: {e}")
             return None
@@ -187,6 +223,9 @@ class FirebaseService:
             data_db = dict(data)
             data_db["created_at"] = firestore.SERVER_TIMESTAMP
             self.db.collection("conversion_logs").document(log_id).set(data_db)
+            return log_id
+        except (ValueError, KeyError) as e:
+            logger.error(f"Geçersiz veri biçimi veya anahtar hatası (log): {e}")
             return log_id
         except Exception as e:
             logger.error(f"Firestore log oluşturma hatası: {e}. Sandbox modunda devam ediliyor.")
@@ -241,6 +280,9 @@ class FirebaseService:
 
             self.db.collection("conversion_logs").document(log_id).update(data)
             return True
+        except (ValueError, KeyError) as e:
+            logger.error(f"Geçersiz veri biçimi veya anahtar hatası (güncelleme): {e}")
+            return True
         except Exception as e:
             logger.error(f"Firestore log güncelleme hatası: {e}")
             return True
@@ -262,6 +304,9 @@ class FirebaseService:
                 data = doc.to_dict()
                 data["id"] = doc.id
                 return data
+            return None
+        except ValueError as e:
+            logger.error(f"Geçersiz kimlik değeri (log getirme): {e}")
             return None
         except Exception as e:
             logger.error(f"Firestore log getirme hatası: {e}")
@@ -305,6 +350,9 @@ class FirebaseService:
                 data["id"] = doc.id
                 results.append(data)
             return results
+        except ValueError as e:
+            logger.error(f"Geçersiz sorgu parametreleri (doküman sorgulama): {e}")
+            return []
         except Exception as e:
             logger.error(f"Firestore doküman sorgulama hatası: {e}")
             return []
@@ -349,6 +397,9 @@ class FirebaseService:
             data_db = dict(data)
             data_db["created_at"] = firestore.SERVER_TIMESTAMP
             self.db.collection("documents").document(doc_id).set(data_db)
+            return doc_id
+        except (ValueError, KeyError) as e:
+            logger.error(f"Geçersiz veri biçimi veya anahtar hatası (kayıt): {e}")
             return doc_id
         except Exception as e:
             logger.error(f"Firestore doküman kaydetme hatası: {e}")

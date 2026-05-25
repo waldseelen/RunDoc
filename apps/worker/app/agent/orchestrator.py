@@ -105,11 +105,14 @@ class AgentOrchestrator:
         # Motor seçimi
         if target_format == "pdf":
             preferred_engine = prefs.get("engine") or suggestions.get("engine")
-            try:
-                plan.engine = EngineRouter.select_pdf_engine(preferred_engine)
-            except RuntimeError:
-                plan.engine = "xelatex"  # Fallback
-            reasoning_parts.append(f"PDF motoru: {plan.engine}")
+            plan.engine = EngineRouter.select_pdf_engine(preferred_engine)
+
+            if plan.engine is None:
+                logger.warning("Hiçbir PDF motoru bulunamadı, HTML fallback uygulanıyor")
+                plan.output_format = "html"
+                reasoning_parts.append("PDF motoru bulunamadı, çıktı HTML'e düşürüldü")
+            else:
+                reasoning_parts.append(f"PDF motoru: {plan.engine}")
 
         elif target_format in ("revealjs", "beamer", "slidy", "pptx"):
             plan.engine = EngineRouter.select_slide_engine(prefs.get("engine"))

@@ -4,17 +4,18 @@ Ana giriş noktası ve API rotaları.
 """
 
 import os
+import re
 import uuid
 import shutil
 import logging
-import tempfile
-from typing import Optional, List
+from enum import Enum
+from typing import Optional, List, Dict, Any
 from pathlib import Path
 
-from fastapi import FastAPI, HTTPException, UploadFile, File, Form, BackgroundTasks
+from fastapi import FastAPI, HTTPException, UploadFile, File, Form, BackgroundTasks, Depends, Header, Request, APIRouter
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator
 
 from app.config import settings
 from app.core.pandoc_cmd import PandocCommandBuilder
@@ -23,14 +24,88 @@ from app.core.parser import DocumentParser
 from app.services.firebase_service import FirebaseService
 
 # =============================================
-# LOGGING
+# LOGGING & TRACING
 # =============================================
 
-logging.basicConfig(
-    level=logging.INFO,
-    format="%(asctime)s - %(name)s - %(levelname)s - %(message)s"
-)
+import json
+import time
+from contextvars import ContextVar
+
+request_id_ctx: ContextVar[Optional[str]] = ContextVar("request_id", default=None)
+
+class JsonFormatter(logging.Formatter):
+    def format(self, record):
+        log_data = {
+            "timestamp": self.formatTime(record, self.datefmt),
+            "level": record.levelname,
+            "name": record.name,
+            "message": record.getMessage(),
+        }
+        req_id = request_id_ctx.get()
+        if req_id:
+            log_data["request_id"] = req_id
+        if record.exc_info:
+            log_data["exception"] = self.formatException(record.exc_info)
+        return json.dumps(log_data, ensure_ascii=False)
+
+# Configure structured JSON logging
+json_handler = logging.StreamHandler()
+json_handler.setFormatter(JsonFormatter("%(asctime)s"))
+
+root_logger = logging.getLogger()
+for h in root_logger.handlers[:]:
+    root_logger.removeHandler(h)
+root_logger.addHandler(json_handler)
+root_logger.setLevel(logging.INFO)
+
 logger = logging.getLogger(__name__)
+
+try:
+    from slowapi import Limiter
+    from slowapi.util import get_remote_address
+    from slowapi.errors import RateLimitExceeded
+    from slowapi.middleware import SlowAPIMiddleware
+    from slowapi import _rate_limit_exceeded_handler
+except ImportError:  # pragma: no cover - optional dependency in some local setups
+    Limiter = None
+    get_remote_address = None
+    RateLimitExceeded = None
+    SlowAPIMiddleware = None
+    _rate_limit_exceeded_handler = None
+
+
+class OutputFormat(str, Enum):
+    PDF = "pdf"
+    DOCX = "docx"
+    ODT = "odt"
+    HTML = "html"
+    HTML5 = "html5"
+    EPUB = "epub"
+    EPUB3 = "epub3"
+    LATEX = "latex"
+    PPTX = "pptx"
+    REVEALJS = "revealjs"
+    BEAMER = "beamer"
+    MARKDOWN = "markdown"
+    GFM = "gfm"
+    RST = "rst"
+    JSON = "json"
+    PLAIN = "plain"
+    RTF = "rtf"
+    TYPST = "typst"
+
+
+OUTPUT_EXT_MAP = {
+    "pdf": ".pdf", "docx": ".docx", "odt": ".odt", "html": ".html",
+    "html5": ".html", "epub": ".epub", "epub3": ".epub", "latex": ".tex",
+    "pptx": ".pptx", "revealjs": ".html", "beamer": ".pdf",
+    "markdown": ".md", "gfm": ".md", "rst": ".rst", "json": ".json",
+    "plain": ".txt", "rtf": ".rtf", "typst": ".typ",
+}
+
+VALID_MATH_RENDERING = {"mathjax", "katex", "mathml", "gladtex", "webtex"}
+_SAFE_KEY_PATTERN = re.compile(r"^[A-Za-z_][A-Za-z0-9_.-]{0,63}$")
+
 
 # =============================================
 # FASTAPI APP
@@ -44,19 +119,77 @@ app = FastAPI(
     redoc_url="/redoc"
 )
 
+# Rate limiting (slowapi varsa aktif)
+limiter = Limiter(key_func=get_remote_address) if Limiter and get_remote_address else None
+if limiter and SlowAPIMiddleware and RateLimitExceeded and _rate_limit_exceeded_handler:
+    app.state.limiter = limiter
+    app.add_middleware(SlowAPIMiddleware)
+    app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
+
+
+def rate_limit(limit: str):
+    if limiter is None:
+        def passthrough(func):
+            return func
+        return passthrough
+    return limiter.limit(limit)
+
+
 # CORS — Next.js frontend'den gelen istekler için
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=[
-        "http://localhost:3000",
-        "http://127.0.0.1:3000",
-        "http://localhost:5173",
-        "http://127.0.0.1:5173",
-    ],
+    allow_origins=settings.allowed_origins,
     allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
+    allow_methods=["GET", "POST", "OPTIONS"],
+    allow_headers=["Authorization", "Content-Type", "X-Request-ID"],
 )
+
+# Tracing & Audit Middleware
+@app.middleware("http")
+async def audit_and_tracing_middleware(request: Request, call_next):
+    req_id = request.headers.get("X-Request-ID") or str(uuid.uuid4())
+    token = request_id_ctx.set(req_id)
+    start_time = time.time()
+    try:
+        response = await call_next(request)
+        duration_ms = int((time.time() - start_time) * 1000)
+        audit_data = {
+            "event": "request_completed",
+            "method": request.method,
+            "path": request.url.path,
+            "status_code": response.status_code,
+            "duration_ms": duration_ms,
+            "client_ip": request.client.host if request.client else "unknown"
+        }
+        logger.info(f"Audit log: {json.dumps(audit_data)}")
+        response.headers["X-Request-ID"] = req_id
+        return response
+    except Exception as e:
+        duration_ms = int((time.time() - start_time) * 1000)
+        audit_data = {
+            "event": "request_failed",
+            "method": request.method,
+            "path": request.url.path,
+            "error": str(e),
+            "duration_ms": duration_ms,
+            "client_ip": request.client.host if request.client else "unknown"
+        }
+        logger.error(f"Audit log error: {json.dumps(audit_data)}")
+        raise
+    finally:
+        request_id_ctx.reset(token)
+
+api_router = APIRouter()
+
+def verify_free_disk_space(required_mb: int = 100):
+    """Verifies that the system has at least the required amount of free space in MB."""
+    total, used, free = shutil.disk_usage(settings.worker_temp_dir)
+    free_mb = free / (1024 * 1024)
+    if free_mb < required_mb:
+        raise HTTPException(
+            status_code=507, 
+            detail=f"Sistemde yeterli disk alanı yok. Gereken: {required_mb}MB, Mevcut: {free_mb:.1f}MB"
+        )
 
 # Mount Local Converted Outputs Static Folder for Zero-Config Preview & Downloads
 os.makedirs(settings.worker_temp_dir, exist_ok=True)
@@ -69,48 +202,136 @@ firebase_service = FirebaseService(
 )
 
 
+def _extract_bearer_token(authorization: Optional[str]) -> Optional[str]:
+    if not authorization:
+        return None
+    parts = authorization.split(" ", 1)
+    if len(parts) != 2 or parts[0].lower() != "bearer":
+        return None
+    token = parts[1].strip()
+    return token or None
+
+
+async def verify_access_token(authorization: Optional[str] = Header(default=None)) -> Dict[str, Any]:
+    """API endpointleri için JWT/API token doğrulaması."""
+    if not settings.worker_require_auth:
+        return {"uid": "anonymous", "provider": "disabled"}
+
+    token = _extract_bearer_token(authorization)
+    if not token:
+        raise HTTPException(status_code=401, detail="Authorization Bearer token gerekli")
+
+    if settings.worker_api_token and token == settings.worker_api_token:
+        return {"uid": "worker-api-token", "provider": "shared-secret"}
+
+    # Sandbox Modu Kontrolü: Firebase service account yoksa, herhangi bir tokenı Sandbox kullanıcısı olarak kabul et
+    has_firebase_creds = settings.firebase_service_account_path and os.path.exists(settings.firebase_service_account_path)
+
+    try:
+        import firebase_admin
+        from firebase_admin import auth as firebase_auth
+
+        firebase_service._initialize()
+        if not firebase_admin._apps or not has_firebase_creds:
+            logger.warning("Firebase service account eksik veya başlatılamadı. İstek Sandbox Modu kapsamında otomatik kabul edildi.")
+            return {"uid": "sandbox-user", "provider": "sandbox"}
+
+        decoded = firebase_auth.verify_id_token(token)
+        uid = decoded.get("uid")
+        if not uid:
+            raise HTTPException(status_code=401, detail="Geçersiz token")
+
+        return {"uid": uid, "provider": "firebase", "claims": decoded}
+    except HTTPException:
+        raise
+    except Exception as e:
+        # Token doğrulaması başarısız olsa bile, Firebase service account bulunmuyorsa Sandbox Modunda devam et
+        if not has_firebase_creds:
+            logger.warning(f"Token doğrulaması başarısız oldu fakat Sandbox Modu kapsamında bypass ediliyor. Hata: {e}")
+            return {"uid": "sandbox-user", "provider": "sandbox"}
+        raise HTTPException(status_code=401, detail="Token doğrulaması başarısız")
+
+
 # =============================================
 # PYDANTIC MODELS
 # =============================================
 
 class ConversionRequest(BaseModel):
     """Dönüşüm isteği modeli."""
-    project_id: str
-    user_id: str
-    input_document_id: str
-    input_format: Optional[str] = None  # None ise otomatik algılanır
-    output_format: str = "pdf"
-    engine: Optional[str] = None  # None ise otomatik seçilir
+    project_id: str = Field(min_length=1, max_length=128)
+    user_id: str = Field(min_length=1, max_length=128)
+    input_document_id: str = Field(min_length=1, max_length=128)
+    input_format: Optional[str] = Field(default=None, max_length=64)  # None ise otomatik algılanır
+    output_format: OutputFormat = OutputFormat.PDF
+    engine: Optional[str] = Field(default=None, max_length=64)  # None ise otomatik seçilir
 
     # Opsiyonel parametreler
     citeproc: bool = False
-    bibliography_id: Optional[str] = None
-    csl_style: Optional[str] = None  # "apa", "mla", "harvard", "ieee" veya özel dosya ID
-    reference_doc_id: Optional[str] = None
-    template_id: Optional[str] = None
+    bibliography_id: Optional[str] = Field(default=None, max_length=128)
+    csl_style: Optional[str] = Field(default=None, max_length=128)  # "apa", "mla", "harvard", "ieee" veya özel dosya ID
+    reference_doc_id: Optional[str] = Field(default=None, max_length=128)
+    template_id: Optional[str] = Field(default=None, max_length=128)
 
     # Filtreler
-    lua_filter_ids: List[str] = Field(default_factory=list)
-    python_filter_ids: List[str] = Field(default_factory=list)
+    lua_filter_ids: List[str] = Field(default_factory=list, max_length=10)
+    python_filter_ids: List[str] = Field(default_factory=list, max_length=10)
 
     # Seçenekler
     toc: bool = False
-    toc_depth: int = 3
+    toc_depth: int = Field(default=3, ge=1, le=6)
     smart: bool = True
     number_sections: bool = False
     standalone: bool = True
-    highlight_style: str = "pygments"
-    math_rendering: str = "mathjax"  # mathjax, katex, mathml
+    highlight_style: str = Field(default="pygments", max_length=64)
+    math_rendering: str = Field(default="mathjax", max_length=16)  # mathjax, katex, mathml
 
     # Medya ayıklama
     extract_media: bool = False
 
     # Ekstra değişkenler
-    variables: dict = Field(default_factory=dict)
-    metadata: dict = Field(default_factory=dict)
+    variables: Dict[str, str] = Field(default_factory=dict)
+    metadata: Dict[str, str] = Field(default_factory=dict)
 
     # Birleştirme için ek dosyalar
-    additional_input_ids: List[str] = Field(default_factory=list)
+    additional_input_ids: List[str] = Field(default_factory=list, max_length=20)
+
+    @field_validator("lua_filter_ids", "python_filter_ids", "additional_input_ids")
+    @classmethod
+    def validate_id_list(cls, value: List[str]) -> List[str]:
+        if len(value) != len(set(value)):
+            raise ValueError("Tekrarlanan ID değerleri gönderilemez")
+        for item in value:
+            if len(item) > 128:
+                raise ValueError("ID değerleri 128 karakterden kısa olmalı")
+        return value
+
+    @field_validator("math_rendering")
+    @classmethod
+    def validate_math_rendering(cls, value: str) -> str:
+        normalized = value.lower().strip()
+        if normalized not in VALID_MATH_RENDERING:
+            raise ValueError(f"Geçersiz math_rendering değeri: {value}")
+        return normalized
+
+    @field_validator("variables", "metadata")
+    @classmethod
+    def validate_key_value_maps(cls, value: Dict[str, str]) -> Dict[str, str]:
+        if len(value) > 50:
+            raise ValueError("En fazla 50 anahtar-değer çifti gönderilebilir")
+
+        sanitized: Dict[str, str] = {}
+        for key, raw in value.items():
+            key = str(key).strip()
+            if not _SAFE_KEY_PATTERN.match(key):
+                raise ValueError(f"Geçersiz anahtar adı: {key}")
+
+            value_str = str(raw)
+            if len(value_str) > 1000:
+                raise ValueError(f"'{key}' değeri 1000 karakteri geçemez")
+
+            sanitized[key] = value_str
+
+        return sanitized
 
 
 class ConversionResponse(BaseModel):
@@ -177,22 +398,22 @@ def run_conversion(request: ConversionRequest, job_id: str, workdir: str):
             raise ValueError(f"Girdi formatı algılanamadı: {input_filename}")
 
         # 4. Çıktı dosya adını belirle
-        output_ext_map = {
-            "pdf": ".pdf", "docx": ".docx", "odt": ".odt", "html": ".html",
-            "html5": ".html", "epub": ".epub", "epub3": ".epub", "latex": ".tex",
-            "pptx": ".pptx", "revealjs": ".html", "beamer": ".pdf",
-            "markdown": ".md", "gfm": ".md", "rst": ".rst", "json": ".json",
-            "plain": ".txt", "rtf": ".rtf", "typst": ".typ",
-        }
-        output_ext = output_ext_map.get(request.output_format, ".out")
+        output_format = request.output_format.value if isinstance(request.output_format, OutputFormat) else str(request.output_format)
+        output_ext = OUTPUT_EXT_MAP.get(output_format, ".out")
         output_filename = f"{Path(input_filename).stem}_output{output_ext}"
         output_local = os.path.join(workdir, output_filename)
 
         # 5. Motor seçimi
         engine = None
-        if request.output_format == "pdf":
+        if output_format == "pdf":
             engine = EngineRouter.select_pdf_engine(request.engine)
-        elif request.output_format in ("revealjs", "beamer", "slidy", "pptx"):
+            if engine is None:
+                logger.warning("PDF motoru bulunamadı, HTML fallback uygulanıyor")
+                output_format = "html"
+                output_ext = OUTPUT_EXT_MAP.get(output_format, ".out")
+                output_filename = f"{Path(input_filename).stem}_output{output_ext}"
+                output_local = os.path.join(workdir, output_filename)
+        elif output_format in ("revealjs", "beamer", "slidy", "pptx"):
             engine = EngineRouter.select_slide_engine(request.engine)
 
         # 6. Pandoc komutunu oluştur
@@ -201,8 +422,8 @@ def run_conversion(request: ConversionRequest, job_id: str, workdir: str):
         if input_format:
             builder.set_input_format(input_format)
 
-        if request.output_format != "pdf":
-            builder.set_output_format(request.output_format)
+        if output_format != "pdf":
+            builder.set_output_format(output_format)
 
         if engine:
             builder.add_engine(engine)
@@ -371,24 +592,30 @@ def run_conversion(request: ConversionRequest, job_id: str, workdir: str):
 # API ROTLARI
 # =============================================
 
-@app.get("/health")
+@api_router.get("/health")
 async def health_check():
-    """Sağlık kontrolü — worker'ın ayakta olduğunu doğrular."""
+    """Sağlık kontrolü — worker, pandoc ve Firebase durumunu doğrular."""
     pandoc_available = shutil.which("pandoc") is not None
+    firebase_available = firebase_service.check_connectivity()
+
+    overall_status = "healthy" if pandoc_available and firebase_available else "degraded"
+
     return {
-        "status": "healthy",
+        "status": overall_status,
         "pandoc_available": pandoc_available,
+        "firebase_available": firebase_available,
+        "auth_required": settings.worker_require_auth,
         "version": "0.1.0"
     }
 
 
-@app.get("/engines")
+@api_router.get("/engines")
 async def list_engines():
     """Kullanılabilir dönüşüm motorlarını listeler."""
     return EngineRouter.get_all_engines_status()
 
 
-@app.get("/formats")
+@api_router.get("/formats")
 async def list_formats():
     """Desteklenen girdi ve çıktı formatlarını listeler."""
     return {
@@ -397,19 +624,34 @@ async def list_formats():
     }
 
 
-@app.post("/convert", response_model=ConversionResponse)
-async def start_conversion(request: ConversionRequest, background_tasks: BackgroundTasks):
+@api_router.post("/convert", response_model=ConversionResponse)
+@rate_limit("5/minute")
+async def start_conversion(
+    request: Request,
+    payload: ConversionRequest,
+    background_tasks: BackgroundTasks,
+    auth_ctx: Dict[str, Any] = Depends(verify_access_token)
+):
     """
     Yeni bir dönüşüm işlemi başlatır.
     İşlem arka planda asenkron olarak çalışır.
     """
+    _ = request
+
+    # Disk alanını kontrol et
+    verify_free_disk_space()
+
+    # Firebase token kullanılıyorsa istek user_id ile token uid eşleşmesini doğrula
+    if auth_ctx.get("provider") == "firebase" and payload.user_id != auth_ctx.get("uid"):
+        raise HTTPException(status_code=403, detail="user_id ile token UID eşleşmiyor")
+
     # Conversion log oluştur
     job_id = firebase_service.create_conversion_log(
-        project_id=request.project_id,
-        user_id=request.user_id,
-        input_format=request.input_format or "auto",
-        output_format=request.output_format,
-        engine=request.engine
+        project_id=payload.project_id,
+        user_id=payload.user_id,
+        input_format=payload.input_format or "auto",
+        output_format=payload.output_format.value if isinstance(payload.output_format, OutputFormat) else str(payload.output_format),
+        engine=payload.engine
     )
 
     if not job_id:
@@ -420,7 +662,7 @@ async def start_conversion(request: ConversionRequest, background_tasks: Backgro
     os.makedirs(workdir, exist_ok=True)
 
     # Arka plan görevi olarak başlat
-    background_tasks.add_task(run_conversion, request, job_id, workdir)
+    background_tasks.add_task(run_conversion, payload, job_id, workdir)
 
     return ConversionResponse(
         job_id=job_id,
@@ -429,13 +671,22 @@ async def start_conversion(request: ConversionRequest, background_tasks: Backgro
     )
 
 
-@app.get("/status/{job_id}", response_model=ConversionStatus)
-async def get_conversion_status(job_id: str):
+@api_router.get("/status/{job_id}", response_model=ConversionStatus)
+@rate_limit("20/minute")
+async def get_conversion_status(
+    http_request: Request,
+    job_id: str,
+    auth_ctx: Dict[str, Any] = Depends(verify_access_token)
+):
     """Dönüşüm işleminin durumunu sorgular. Bulut URL'si yoksa otomatik yerel statik sunumu hedefler."""
+    _ = http_request
     log = firebase_service.get_conversion_log(job_id)
 
     if not log:
         raise HTTPException(status_code=404, detail="Dönüşüm kaydı bulunamadı")
+
+    if auth_ctx.get("provider") == "firebase" and log.get("user_id") != auth_ctx.get("uid"):
+        raise HTTPException(status_code=403, detail="Bu dönüşüm kaydına erişim izniniz yok")
 
     # Çıktı URL'si (tamamlandıysa)
     output_url = log.get("output_url")
@@ -444,8 +695,8 @@ async def get_conversion_status(job_id: str):
             docs = firebase_service.get_project_documents(log["project_id"], "output")
             output_doc = next((d for d in docs if d["id"] == log["output_document_id"]), None)
             if output_doc:
-                output_url = firebase_service.create_signed_url("output", output_doc["storage_path"])
-        
+                output_url = firebase_service.create_signed_url(output_doc["storage_path"])
+
         # Yerel Sandbox Fallback: Eğer Firebase URL yoksa diskte dosyayı ara ve sun
         if not output_url:
             workdir = os.path.join(settings.worker_temp_dir, str(job_id))
@@ -467,12 +718,13 @@ async def get_conversion_status(job_id: str):
     )
 
 
-@app.post("/convert-direct", response_model=ConversionStatus)
+@api_router.post("/convert-direct", response_model=ConversionStatus)
+@rate_limit("10/minute")
 async def convert_direct(
-    background_tasks: BackgroundTasks,
+    http_request: Request,
     text: Optional[str] = Form(default=None),
     file: Optional[UploadFile] = File(default=None),
-    output_format: str = Form(default="pdf"),
+    output_format: OutputFormat = Form(default=OutputFormat.PDF),
     engine: Optional[str] = Form(default=None),
     citeproc: bool = Form(default=False),
     toc: bool = Form(default=False),
@@ -482,16 +734,31 @@ async def convert_direct(
     standalone: bool = Form(default=True),
     highlight_style: str = Form(default="pygments"),
     math_rendering: str = Form(default="mathjax"),
-    extract_media: bool = Form(default=False)
+    extract_media: bool = Form(default=False),
+    auth_ctx: Dict[str, Any] = Depends(verify_access_token)
 ):
     """
     Firebase/Firestore bağımlılığı olmadan doğrudan dosya veya ham metin dönüştürme gerçekleştirir.
     Sonuçlar FastAPI statik dosya sunucusu üzerinden anında indirilebilir ve önizlenebilir.
     """
-    import time
+    _ = auth_ctx
+    _ = http_request
+
+    # Disk alanını kontrol et
+    verify_free_disk_space()
+
+    if not (1 <= toc_depth <= 6):
+        raise HTTPException(status_code=422, detail="toc_depth değeri 1-6 arasında olmalıdır")
+
+    math_rendering = math_rendering.lower().strip()
+    if math_rendering not in VALID_MATH_RENDERING:
+        raise HTTPException(status_code=422, detail=f"Geçersiz math_rendering değeri: {math_rendering}")
+
     job_id = str(uuid.uuid4())
     workdir = os.path.join(settings.worker_temp_dir, job_id)
     os.makedirs(workdir, exist_ok=True)
+
+    output_format_value = output_format.value if isinstance(output_format, OutputFormat) else str(output_format)
 
     try:
         input_filename = "document.md"
@@ -501,10 +768,23 @@ async def convert_direct(
         if file:
             input_filename = os.path.basename(file.filename or "input")
             input_local = os.path.join(workdir, input_filename)
+            content = await file.read()
+
+            max_bytes = settings.max_file_size_mb * 1024 * 1024
+            if len(content) > max_bytes:
+                raise HTTPException(
+                    status_code=413,
+                    detail=f"Dosya boyutu sınırı aşıldı. Maksimum: {settings.max_file_size_mb}MB"
+                )
+
             with open(input_local, "wb") as f:
-                content = await file.read()
                 f.write(content)
         elif text is not None:
+            if len(text.encode("utf-8")) > settings.max_file_size_mb * 1024 * 1024:
+                raise HTTPException(
+                    status_code=413,
+                    detail=f"Metin boyutu sınırı aşıldı. Maksimum: {settings.max_file_size_mb}MB"
+                )
             with open(input_local, "w", encoding="utf-8") as f:
                 f.write(text)
         else:
@@ -513,31 +793,29 @@ async def convert_direct(
         # Format algıla
         input_format = DocumentParser.detect_format(input_local) or "markdown"
 
-        # Çıktı uzantısı eşlemesi
-        output_ext_map = {
-            "pdf": ".pdf", "docx": ".docx", "odt": ".odt", "html": ".html",
-            "html5": ".html", "epub": ".epub", "epub3": ".epub", "latex": ".tex",
-            "pptx": ".pptx", "revealjs": ".html", "beamer": ".pdf",
-            "markdown": ".md", "gfm": ".md", "rst": ".rst", "json": ".json",
-            "plain": ".txt", "rtf": ".rtf", "typst": ".typ",
-        }
-        output_ext = output_ext_map.get(output_format, ".out")
+        output_ext = OUTPUT_EXT_MAP.get(output_format_value, ".out")
         output_filename = f"compiled_output{output_ext}"
         output_local = os.path.join(workdir, output_filename)
 
         # PDF veya slayt motor tercihlerini belirle
         engine_to_use = None
-        if output_format == "pdf":
+        if output_format_value == "pdf":
             engine_to_use = EngineRouter.select_pdf_engine(engine)
-        elif output_format in ("revealjs", "beamer", "slidy", "pptx"):
+            if engine_to_use is None:
+                logger.warning("PDF motoru bulunamadı, convert-direct isteği HTML'e düşürüldü")
+                output_format_value = "html"
+                output_ext = OUTPUT_EXT_MAP.get(output_format_value, ".out")
+                output_filename = f"compiled_output{output_ext}"
+                output_local = os.path.join(workdir, output_filename)
+        elif output_format_value in ("revealjs", "beamer", "slidy", "pptx"):
             engine_to_use = EngineRouter.select_slide_engine(engine)
 
         # Komut inşası
         builder = PandocCommandBuilder(input_local, output_local)
         builder.set_input_format(input_format)
 
-        if output_format != "pdf":
-            builder.set_output_format(output_format)
+        if output_format_value != "pdf":
+            builder.set_output_format(output_format_value)
         if engine_to_use:
             builder.add_engine(engine_to_use)
         if standalone:
@@ -558,7 +836,7 @@ async def convert_direct(
             media_dir = os.path.join(workdir, "extracted_media")
             builder.extract_media(media_dir)
 
-        # Eşzamanlı (synchronous) derleme ile anında yüksek hızlı tepki
+        # Eşzamanlı (synchronous) derleme ile anında yüksek hızda tepki
         result = builder.execute()
 
         if result["status"] == "success" and os.path.exists(output_local):
@@ -567,9 +845,9 @@ async def convert_direct(
             # Log loglarını yerel cache'e kaydet (durum sorguları için)
             firebase_service._mock_logs[job_id] = {
                 "project_id": "direct",
-                "user_id": "direct",
+                "user_id": auth_ctx.get("uid", "direct"),
                 "input_format": input_format,
-                "output_format": output_format,
+                "output_format": output_format_value,
                 "engine_used": engine_to_use,
                 "status": "completed",
                 "execution_time_ms": result["execution_time_ms"],
@@ -581,23 +859,25 @@ async def convert_direct(
                 job_id=job_id,
                 status="completed",
                 input_format=input_format,
-                output_format=output_format,
+                output_format=output_format_value,
                 engine_used=engine_to_use,
                 execution_time_ms=result["execution_time_ms"],
                 output_url=output_url,
                 command_executed=result.get("cmd")
             )
-        else:
-            return ConversionStatus(
-                job_id=job_id,
-                status="failed",
-                input_format=input_format,
-                output_format=output_format,
-                engine_used=engine_to_use,
-                error_message=result.get("stderr", "Bilinmeyen derleme hatası."),
-                command_executed=result.get("cmd")
-            )
 
+        return ConversionStatus(
+            job_id=job_id,
+            status="failed",
+            input_format=input_format,
+            output_format=output_format_value,
+            engine_used=engine_to_use,
+            error_message=result.get("stderr", "Bilinmeyen derleme hatası."),
+            command_executed=result.get("cmd")
+        )
+
+    except HTTPException:
+        raise
     except Exception as e:
         logger.error(f"Doğrudan dönüşüm hatası: {str(e)}")
         return ConversionStatus(
@@ -607,15 +887,21 @@ async def convert_direct(
         )
 
 
-@app.post("/analyze")
+@api_router.post("/analyze")
+@rate_limit("10/minute")
 async def analyze_document(
+    http_request: Request,
     file: UploadFile = File(...),
-    target_format: str = Form(default="pdf")
+    target_format: OutputFormat = Form(default=OutputFormat.PDF),
+    auth_ctx: Dict[str, Any] = Depends(verify_access_token)
 ):
     """
     Yüklenen dokümanı analiz eder ve önerilen dönüşüm seçeneklerini döndürür.
     Dosya kalıcı olarak saklanmaz, sadece analiz için geçici olarak işlenir.
     """
+    _ = auth_ctx
+    _ = http_request
+
     # Geçici dosya oluştur
     workdir = os.path.join(settings.worker_temp_dir, f"analyze_{uuid.uuid4().hex[:8]}")
     os.makedirs(workdir, exist_ok=True)
@@ -627,10 +913,10 @@ async def analyze_document(
             content = await file.read()
             f.write(content)
 
-        # Format algılama
+        # Format algıla
         detected_format = DocumentParser.detect_format(local_path)
 
-        # Metadata çıkarma
+        # Metadata çıkar
         metadata = {}
         if detected_format in ("markdown", "latex", "rst"):
             metadata = DocumentParser.extract_yaml_metadata(local_path)
@@ -641,7 +927,8 @@ async def analyze_document(
             content_analysis = DocumentParser.analyze_content(local_path)
 
         # Önerilen seçenekler
-        suggested = DocumentParser.suggest_conversion_options(content_analysis, target_format)
+        target_format_value = target_format.value if isinstance(target_format, OutputFormat) else str(target_format)
+        suggested = DocumentParser.suggest_conversion_options(content_analysis, target_format_value)
 
         return AnalysisResponse(
             format_detected=detected_format,
@@ -652,3 +939,7 @@ async def analyze_document(
 
     finally:
         shutil.rmtree(workdir, ignore_errors=True)
+
+# Register API Router
+app.include_router(api_router, prefix="/api/v1")
+app.include_router(api_router)

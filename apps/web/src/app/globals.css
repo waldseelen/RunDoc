@@ -111,7 +111,7 @@ html.light, [data-theme="light"] {
 
 * {
   scrollbar-width: thin;
-  scrollbar-color: var(--foreground-muted) transparent;
+  scrollbar-color: rgba(157, 157, 181, 0.4) transparent;
 }
 
 *::-webkit-scrollbar {
@@ -122,13 +122,14 @@ html.light, [data-theme="light"] {
   background: transparent;
 }
 *::-webkit-scrollbar-thumb {
-  background: var(--border);
+  background: rgba(157, 157, 181, 0.4);
   border: 2px solid transparent;
   background-clip: content-box;
   border-radius: 8px;
+  transition: background 0.2s ease;
 }
 *::-webkit-scrollbar-thumb:hover {
-  background: var(--foreground-muted);
+  background: rgba(157, 157, 181, 0.7);
   border: 2px solid transparent;
   background-clip: content-box;
 }
@@ -564,6 +565,29 @@ body {
   border-radius: 0;
   overflow: hidden;
   border: 0;
+}
+
+/* Monaco Editor Scrollbars */
+.monaco-editor .monaco-scrollable-element > .scrollbar {
+  background: transparent !important;
+}
+
+.monaco-editor .monaco-scrollable-element > .scrollbar > .slider {
+  background: rgba(157, 157, 181, 0.4) !important;
+  border-radius: 8px !important;
+}
+
+.monaco-editor .monaco-scrollable-element > .scrollbar > .slider:hover {
+  background: rgba(157, 157, 181, 0.7) !important;
+}
+
+.monaco-editor .monoscroll {
+  background: rgba(157, 157, 181, 0.4) !important;
+  border-radius: 8px !important;
+}
+
+.monaco-editor .monoscroll:hover {
+  background: rgba(157, 157, 181, 0.7) !important;
 }
 
 /* Override Monaco red error decorations */

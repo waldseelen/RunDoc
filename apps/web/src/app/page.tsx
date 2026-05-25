@@ -32,7 +32,7 @@ import {
 } from "lucide-react";
 import { useAppSettings } from "@/hooks/useAppSettings";
 import BrandLogo from "@/components/brand-logo";
-import { useStartConversion } from "@/hooks/useConversion";
+import { useStartConversion, getWorkerAuthToken } from "@/hooks/useConversion";
 
 // =============================================
 // Static Demo Projects
@@ -104,8 +104,15 @@ export default function DashboardPage() {
       formData.append("smart", "true");
       formData.append("math_rendering", "mathjax");
 
-      const response = await fetch(`${process.env.NEXT_PUBLIC_WORKER_API_URL || "http://localhost:8000"}/convert-direct`, {
+      const token = getWorkerAuthToken();
+      const headers: Record<string, string> = {};
+      if (token) {
+        headers["Authorization"] = `Bearer ${token}`;
+      }
+
+      const response = await fetch(`${process.env.NEXT_PUBLIC_WORKER_API_URL || "http://localhost:8000"}/api/v1/convert-direct`, {
         method: "POST",
+        headers,
         body: formData,
       });
 

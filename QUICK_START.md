@@ -24,7 +24,11 @@ python -m uvicorn app.main:app --reload --port 8000
 
 ### **3️⃣ Test Conversion (HTML)**
 ```bash
+# If auth is enabled (default), define token first
+export WORKER_API_TOKEN=change-me
+
 curl -X POST http://localhost:8000/convert-direct \
+  -H "Authorization: Bearer $WORKER_API_TOKEN" \
   -F "text=# Hello World" \
   -F "output_format=html"
 
@@ -204,7 +208,7 @@ python -c "import app; print(app.__file__)"
 
 - **Full Report**: See `COMPILATION_FIX_REPORT.md`
 - **API Docs**: http://localhost:8000/docs (when server running)
-- **Architecture**: See `ARHICTECTURE.md`
+- **Architecture**: See `ARCHITECTURE.md`
 - **Requirements**: See `PRD.md`
 
 ---

@@ -24,6 +24,7 @@ import Uploader from "@/components/uploader";
 import ConversionPanel, { type ConversionSettings } from "@/components/conversion-panel";
 import Preview from "@/components/preview";
 import { useAppSettings } from "@/hooks/useAppSettings";
+import { getWorkerAuthToken } from "@/hooks/useConversion";
 
 // Monaco Editor'ü SSR devre dışı bırakarak yükle
 const CodeEditor = dynamic(() => import("@/components/editor"), { ssr: false });
@@ -173,8 +174,15 @@ export default function WorkspacePage() {
       formData.append("math_rendering", settings.mathRendering);
       formData.append("extract_media", settings.extractMedia ? "true" : "false");
 
-      const response = await fetch(`${process.env.NEXT_PUBLIC_WORKER_API_URL || "http://localhost:8000"}/convert-direct`, {
+      const token = getWorkerAuthToken();
+      const headers: Record<string, string> = {};
+      if (token) {
+        headers["Authorization"] = `Bearer ${token}`;
+      }
+
+      const response = await fetch(`${process.env.NEXT_PUBLIC_WORKER_API_URL || "http://localhost:8000"}/api/v1/convert-direct`, {
         method: "POST",
+        headers,
         body: formData,
       });
 
