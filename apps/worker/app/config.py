@@ -11,12 +11,12 @@ from dataclasses import dataclass, field
 class Settings:
     """Application settings loaded from environment variables."""
 
-    # Supabase
-    supabase_url: str = field(
-        default_factory=lambda: os.getenv("SUPABASE_URL", "")
+    # Firebase
+    firebase_service_account_path: str = field(
+        default_factory=lambda: os.getenv("FIREBASE_SERVICE_ACCOUNT_PATH", "./firebase-service-account.json")
     )
-    supabase_service_key: str = field(
-        default_factory=lambda: os.getenv("SUPABASE_SERVICE_ROLE_KEY", "")
+    firebase_storage_bucket: str = field(
+        default_factory=lambda: os.getenv("FIREBASE_STORAGE_BUCKET", "")
     )
 
     # Worker

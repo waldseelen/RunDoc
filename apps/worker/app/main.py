@@ -19,7 +19,7 @@ from app.config import settings
 from app.core.pandoc_cmd import PandocCommandBuilder
 from app.core.engines import EngineRouter
 from app.core.parser import DocumentParser
-from app.services.supabase_service import SupabaseService
+from app.services.firebase_service import FirebaseService
 
 # =============================================
 # LOGGING
@@ -55,10 +55,10 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# Supabase servisi
-supabase_service = SupabaseService(
-    url=settings.supabase_url,
-    service_key=settings.supabase_service_key
+# Supabase servisi (artık Firebase servisi)
+firebase_service = FirebaseService(
+    service_account_path=settings.firebase_service_account_path,
+    storage_bucket=settings.firebase_storage_bucket
 )
 
 
@@ -145,10 +145,10 @@ def run_conversion(request: ConversionRequest, job_id: str, workdir: str):
     """
     try:
         # 1. Durumu "processing" olarak güncelle
-        supabase_service.update_conversion_status(job_id, "processing")
+        firebase_service.update_conversion_status(job_id, "processing")
 
         # 2. Girdi dosyasını indir
-        input_doc = supabase_service.get_project_documents(request.project_id)
+        input_doc = firebase_service.get_project_documents(request.project_id)
         input_doc_info = next(
             (d for d in input_doc if d["id"] == request.input_document_id), None
         )
@@ -162,7 +162,7 @@ def run_conversion(request: ConversionRequest, job_id: str, workdir: str):
         bucket = input_doc_info.get("file_type", "source")
         storage_path = input_doc_info["storage_path"]
 
-        supabase_service.download_file(bucket, storage_path, input_local)
+        firebase_service.download_file(bucket, storage_path, input_local)
 
         # 3. Format algılama
         input_format = request.input_format or DocumentParser.detect_format(input_local)
@@ -229,13 +229,13 @@ def run_conversion(request: ConversionRequest, job_id: str, workdir: str):
 
         # Kaynakça dosyası indir ve ekle
         if request.bibliography_id:
-            bib_docs = supabase_service.get_project_documents(
+            bib_docs = firebase_service.get_project_documents(
                 request.project_id, "bibliography"
             )
             bib_doc = next((d for d in bib_docs if d["id"] == request.bibliography_id), None)
             if bib_doc:
                 bib_local = os.path.join(workdir, bib_doc["file_name"])
-                supabase_service.download_file("bibliography", bib_doc["storage_path"], bib_local)
+                firebase_service.download_file("bibliography", bib_doc["storage_path"], bib_local)
                 builder.add_bibliography(bib_local)
 
         # CSL stili
@@ -250,42 +250,42 @@ def run_conversion(request: ConversionRequest, job_id: str, workdir: str):
             else:
                 # Özel CSL dosyası
                 csl_local = os.path.join(workdir, f"{request.csl_style}.csl")
-                supabase_service.download_file("bibliography", request.csl_style, csl_local)
+                firebase_service.download_file("bibliography", request.csl_style, csl_local)
                 builder.add_csl_style(csl_local)
 
         # Referans doküman
         if request.reference_doc_id:
-            ref_docs = supabase_service.get_project_documents(
+            ref_docs = firebase_service.get_project_documents(
                 request.project_id, "reference"
             )
             ref_doc = next((d for d in ref_docs if d["id"] == request.reference_doc_id), None)
             if ref_doc:
                 ref_local = os.path.join(workdir, ref_doc["file_name"])
-                supabase_service.download_file("reference", ref_doc["storage_path"], ref_local)
+                firebase_service.download_file("reference", ref_doc["storage_path"], ref_local)
                 builder.add_reference_doc(ref_local)
 
         # Lua filtreleri
         filters_applied = []
         for filter_id in request.lua_filter_ids:
-            filter_docs = supabase_service.get_project_documents(
+            filter_docs = firebase_service.get_project_documents(
                 request.project_id, "filter"
             )
             filter_doc = next((d for d in filter_docs if d["id"] == filter_id), None)
             if filter_doc:
                 filter_local = os.path.join(workdir, filter_doc["file_name"])
-                supabase_service.download_file("filters", filter_doc["storage_path"], filter_local)
+                firebase_service.download_file("filters", filter_doc["storage_path"], filter_local)
                 builder.add_lua_filter(filter_local)
                 filters_applied.append(filter_doc["file_name"])
 
         # Python filtreleri
         for filter_id in request.python_filter_ids:
-            filter_docs = supabase_service.get_project_documents(
+            filter_docs = firebase_service.get_project_documents(
                 request.project_id, "filter"
             )
             filter_doc = next((d for d in filter_docs if d["id"] == filter_id), None)
             if filter_doc:
                 filter_local = os.path.join(workdir, filter_doc["file_name"])
-                supabase_service.download_file("filters", filter_doc["storage_path"], filter_local)
+                firebase_service.download_file("filters", filter_doc["storage_path"], filter_local)
                 builder.add_python_filter(filter_local)
                 filters_applied.append(filter_doc["file_name"])
 
@@ -296,11 +296,11 @@ def run_conversion(request: ConversionRequest, job_id: str, workdir: str):
 
         # Ek girdi dosyaları (birleştirme)
         for additional_id in request.additional_input_ids:
-            add_docs = supabase_service.get_project_documents(request.project_id)
+            add_docs = firebase_service.get_project_documents(request.project_id)
             add_doc = next((d for d in add_docs if d["id"] == additional_id), None)
             if add_doc:
                 add_local = os.path.join(workdir, f"add_{add_doc['file_name']}")
-                supabase_service.download_file(
+                firebase_service.download_file(
                     add_doc.get("file_type", "source"), add_doc["storage_path"], add_local
                 )
                 builder.add_extra_input(add_local)
@@ -312,10 +312,10 @@ def run_conversion(request: ConversionRequest, job_id: str, workdir: str):
         if result["status"] == "success" and os.path.exists(output_local):
             # Çıktıyı Storage'a yükle
             output_storage_path = f"{request.project_id}/{job_id}/{output_filename}"
-            supabase_service.upload_file("output", output_storage_path, output_local)
+            firebase_service.upload_file("output", output_storage_path, output_local)
 
             # Doküman kaydı
-            output_doc_id = supabase_service.register_document(
+            output_doc_id = firebase_service.register_document(
                 project_id=request.project_id,
                 file_name=output_filename,
                 storage_path=output_storage_path,
@@ -324,7 +324,7 @@ def run_conversion(request: ConversionRequest, job_id: str, workdir: str):
             )
 
             # Başarılı durum güncelle
-            supabase_service.update_conversion_status(
+            firebase_service.update_conversion_status(
                 log_id=job_id,
                 status="completed",
                 command_executed=result.get("cmd"),
@@ -336,7 +336,7 @@ def run_conversion(request: ConversionRequest, job_id: str, workdir: str):
             logger.info(f"Dönüşüm tamamlandı: {job_id}")
 
         else:
-            supabase_service.update_conversion_status(
+            firebase_service.update_conversion_status(
                 log_id=job_id,
                 status="failed",
                 command_executed=result.get("cmd"),
@@ -348,7 +348,7 @@ def run_conversion(request: ConversionRequest, job_id: str, workdir: str):
 
     except Exception as e:
         logger.error(f"Dönüşüm hatası: {job_id} — {str(e)}")
-        supabase_service.update_conversion_status(
+        firebase_service.update_conversion_status(
             log_id=job_id,
             status="failed",
             error_message=str(e)
@@ -397,7 +397,7 @@ async def start_conversion(request: ConversionRequest, background_tasks: Backgro
     İşlem arka planda asenkron olarak çalışır.
     """
     # Conversion log oluştur
-    job_id = supabase_service.create_conversion_log(
+    job_id = firebase_service.create_conversion_log(
         project_id=request.project_id,
         user_id=request.user_id,
         input_format=request.input_format or "auto",
@@ -425,7 +425,7 @@ async def start_conversion(request: ConversionRequest, background_tasks: Backgro
 @app.get("/status/{job_id}", response_model=ConversionStatus)
 async def get_conversion_status(job_id: str):
     """Dönüşüm işleminin durumunu sorgular."""
-    log = supabase_service.get_conversion_log(job_id)
+    log = firebase_service.get_conversion_log(job_id)
 
     if not log:
         raise HTTPException(status_code=404, detail="Dönüşüm kaydı bulunamadı")
@@ -433,10 +433,10 @@ async def get_conversion_status(job_id: str):
     # Çıktı URL'si (tamamlandıysa)
     output_url = None
     if log.get("status") == "completed" and log.get("output_document_id"):
-        docs = supabase_service.get_project_documents(log["project_id"], "output")
+        docs = firebase_service.get_project_documents(log["project_id"], "output")
         output_doc = next((d for d in docs if d["id"] == log["output_document_id"]), None)
         if output_doc:
-            output_url = supabase_service.create_signed_url("output", output_doc["storage_path"])
+            output_url = firebase_service.create_signed_url("output", output_doc["storage_path"])
 
     return ConversionStatus(
         job_id=job_id,
