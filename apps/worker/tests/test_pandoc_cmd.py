@@ -105,7 +105,8 @@ class TestPandocCommandBuilder:
             .add_toc()
             .build()
         )
-        assert "--from=markdown" in cmd
+        # Pandoc 3.x+: --smart flag +smart uzantısına dönüştürülür
+        assert any("--from=markdown" in str(c) for c in cmd)  # markdown veya markdown+smart
         assert "--pdf-engine=xelatex" in cmd
         assert "--citeproc" in cmd
         assert "--bibliography=refs.bib" in cmd
@@ -260,7 +261,7 @@ class TestErrorRecovery:
     def test_suggest_retry_timeout(self):
         """Zaman aşımı artırma önerisi."""
         diagnoses = ErrorRecovery.diagnose("Process timeout expired")
-        retry = ErrorRecovery.suggest_retry_params(diagnoses, timeout=120)
+        retry = ErrorRecovery.suggest_retry_params(diagnoses, current_timeout=120)
         assert retry is not None
         assert retry.get("timeout", 0) > 120
 

@@ -151,14 +151,23 @@ class ErrorRecovery:
         cls,
         diagnoses: List[ErrorDiagnosis],
         current_engine: Optional[str] = None,
-        current_timeout: int = 120
+        timeout: Optional[int] = None,
+        current_timeout: Optional[int] = None
     ) -> Optional[Dict]:
         """
         Teşhislere dayalı olarak yeniden deneme parametreleri önerir.
 
+        Args:
+            diagnoses: Teşhis listesi
+            current_engine: Şu anki motor
+            timeout: Alternatif parametrize (legacy support)
+            current_timeout: Güncel timeout değeri (default: 120)
+
         Returns:
             Dict veya None: Yeniden deneme parametreleri
         """
+        # Parametrize uyumluluğu: timeout → current_timeout
+        effective_timeout = current_timeout or timeout or 120
         retry_params = {}
 
         for diagnosis in diagnoses:
@@ -180,8 +189,8 @@ class ErrorRecovery:
 
             elif action == "increase_timeout":
                 multiplier = diagnosis.fix_params.get("multiplier", 2)
-                retry_params["timeout"] = min(current_timeout * multiplier, 600)
-                logger.info(f"Timeout artırılıyor: {current_timeout} → {retry_params['timeout']}")
+                retry_params["timeout"] = min(effective_timeout * multiplier, 600)
+                logger.info(f"Timeout artırılıyor: {effective_timeout} → {retry_params['timeout']}")
 
             elif action == "force_encoding":
                 retry_params["encoding"] = diagnosis.fix_params.get("encoding", "utf-8")

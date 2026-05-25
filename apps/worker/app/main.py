@@ -13,6 +13,7 @@ from pathlib import Path
 
 from fastapi import FastAPI, HTTPException, UploadFile, File, Form, BackgroundTasks
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field
 
 from app.config import settings
@@ -49,11 +50,17 @@ app.add_middleware(
     allow_origins=[
         "http://localhost:3000",
         "http://127.0.0.1:3000",
+        "http://localhost:5173",
+        "http://127.0.0.1:5173",
     ],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+# Mount Local Converted Outputs Static Folder for Zero-Config Preview & Downloads
+os.makedirs(settings.worker_temp_dir, exist_ok=True)
+app.mount("/outputs", StaticFiles(directory=settings.worker_temp_dir), name="outputs")
 
 # Supabase servisi (artık Firebase servisi)
 firebase_service = FirebaseService(
@@ -424,19 +431,28 @@ async def start_conversion(request: ConversionRequest, background_tasks: Backgro
 
 @app.get("/status/{job_id}", response_model=ConversionStatus)
 async def get_conversion_status(job_id: str):
-    """Dönüşüm işleminin durumunu sorgular."""
+    """Dönüşüm işleminin durumunu sorgular. Bulut URL'si yoksa otomatik yerel statik sunumu hedefler."""
     log = firebase_service.get_conversion_log(job_id)
 
     if not log:
         raise HTTPException(status_code=404, detail="Dönüşüm kaydı bulunamadı")
 
     # Çıktı URL'si (tamamlandıysa)
-    output_url = None
-    if log.get("status") == "completed" and log.get("output_document_id"):
-        docs = firebase_service.get_project_documents(log["project_id"], "output")
-        output_doc = next((d for d in docs if d["id"] == log["output_document_id"]), None)
-        if output_doc:
-            output_url = firebase_service.create_signed_url("output", output_doc["storage_path"])
+    output_url = log.get("output_url")
+    if log.get("status") == "completed" and not output_url:
+        if log.get("output_document_id"):
+            docs = firebase_service.get_project_documents(log["project_id"], "output")
+            output_doc = next((d for d in docs if d["id"] == log["output_document_id"]), None)
+            if output_doc:
+                output_url = firebase_service.create_signed_url("output", output_doc["storage_path"])
+        
+        # Yerel Sandbox Fallback: Eğer Firebase URL yoksa diskte dosyayı ara ve sun
+        if not output_url:
+            workdir = os.path.join(settings.worker_temp_dir, str(job_id))
+            if os.path.exists(workdir):
+                files = [f for f in os.listdir(workdir) if f.startswith("compiled_output") or "_output" in f]
+                if files:
+                    output_url = f"{settings.worker_api_url}/outputs/{job_id}/{files[0]}"
 
     return ConversionStatus(
         job_id=job_id,
@@ -449,6 +465,146 @@ async def get_conversion_status(job_id: str):
         output_url=output_url,
         command_executed=log.get("command_executed")
     )
+
+
+@app.post("/convert-direct", response_model=ConversionStatus)
+async def convert_direct(
+    background_tasks: BackgroundTasks,
+    text: Optional[str] = Form(default=None),
+    file: Optional[UploadFile] = File(default=None),
+    output_format: str = Form(default="pdf"),
+    engine: Optional[str] = Form(default=None),
+    citeproc: bool = Form(default=False),
+    toc: bool = Form(default=False),
+    toc_depth: int = Form(default=3),
+    smart: bool = Form(default=True),
+    number_sections: bool = Form(default=False),
+    standalone: bool = Form(default=True),
+    highlight_style: str = Form(default="pygments"),
+    math_rendering: str = Form(default="mathjax"),
+    extract_media: bool = Form(default=False)
+):
+    """
+    Firebase/Firestore bağımlılığı olmadan doğrudan dosya veya ham metin dönüştürme gerçekleştirir.
+    Sonuçlar FastAPI statik dosya sunucusu üzerinden anında indirilebilir ve önizlenebilir.
+    """
+    import time
+    job_id = str(uuid.uuid4())
+    workdir = os.path.join(settings.worker_temp_dir, job_id)
+    os.makedirs(workdir, exist_ok=True)
+
+    try:
+        input_filename = "document.md"
+        input_local = os.path.join(workdir, input_filename)
+
+        # Girdi tipini belirle ve diske yaz
+        if file:
+            input_filename = os.path.basename(file.filename or "input")
+            input_local = os.path.join(workdir, input_filename)
+            with open(input_local, "wb") as f:
+                content = await file.read()
+                f.write(content)
+        elif text is not None:
+            with open(input_local, "w", encoding="utf-8") as f:
+                f.write(text)
+        else:
+            raise HTTPException(status_code=400, detail="Dönüşüm için metin (text) veya dosya (file) sağlanmalıdır.")
+
+        # Format algıla
+        input_format = DocumentParser.detect_format(input_local) or "markdown"
+
+        # Çıktı uzantısı eşlemesi
+        output_ext_map = {
+            "pdf": ".pdf", "docx": ".docx", "odt": ".odt", "html": ".html",
+            "html5": ".html", "epub": ".epub", "epub3": ".epub", "latex": ".tex",
+            "pptx": ".pptx", "revealjs": ".html", "beamer": ".pdf",
+            "markdown": ".md", "gfm": ".md", "rst": ".rst", "json": ".json",
+            "plain": ".txt", "rtf": ".rtf", "typst": ".typ",
+        }
+        output_ext = output_ext_map.get(output_format, ".out")
+        output_filename = f"compiled_output{output_ext}"
+        output_local = os.path.join(workdir, output_filename)
+
+        # PDF veya slayt motor tercihlerini belirle
+        engine_to_use = None
+        if output_format == "pdf":
+            engine_to_use = EngineRouter.select_pdf_engine(engine)
+        elif output_format in ("revealjs", "beamer", "slidy", "pptx"):
+            engine_to_use = EngineRouter.select_slide_engine(engine)
+
+        # Komut inşası
+        builder = PandocCommandBuilder(input_local, output_local)
+        builder.set_input_format(input_format)
+
+        if output_format != "pdf":
+            builder.set_output_format(output_format)
+        if engine_to_use:
+            builder.add_engine(engine_to_use)
+        if standalone:
+            builder.set_standalone()
+        if smart:
+            builder.enable_smart_typography()
+        if toc:
+            builder.add_toc(toc_depth)
+        if number_sections:
+            builder.set_number_sections()
+        if citeproc:
+            builder.enable_citeproc()
+        if highlight_style:
+            builder.set_highlight_style(highlight_style)
+        if math_rendering:
+            builder.set_math_rendering(math_rendering)
+        if extract_media:
+            media_dir = os.path.join(workdir, "extracted_media")
+            builder.extract_media(media_dir)
+
+        # Eşzamanlı (synchronous) derleme ile anında yüksek hızlı tepki
+        result = builder.execute()
+
+        if result["status"] == "success" and os.path.exists(output_local):
+            output_url = f"{settings.worker_api_url}/outputs/{job_id}/{output_filename}"
+
+            # Log loglarını yerel cache'e kaydet (durum sorguları için)
+            firebase_service._mock_logs[job_id] = {
+                "project_id": "direct",
+                "user_id": "direct",
+                "input_format": input_format,
+                "output_format": output_format,
+                "engine_used": engine_to_use,
+                "status": "completed",
+                "execution_time_ms": result["execution_time_ms"],
+                "output_url": output_url,
+                "command_executed": result.get("cmd")
+            }
+
+            return ConversionStatus(
+                job_id=job_id,
+                status="completed",
+                input_format=input_format,
+                output_format=output_format,
+                engine_used=engine_to_use,
+                execution_time_ms=result["execution_time_ms"],
+                output_url=output_url,
+                command_executed=result.get("cmd")
+            )
+        else:
+            return ConversionStatus(
+                job_id=job_id,
+                status="failed",
+                input_format=input_format,
+                output_format=output_format,
+                engine_used=engine_to_use,
+                error_message=result.get("stderr", "Bilinmeyen derleme hatası."),
+                command_executed=result.get("cmd")
+            )
+
+    except Exception as e:
+        logger.error(f"Doğrudan dönüşüm hatası: {str(e)}")
+        return ConversionStatus(
+            job_id=job_id,
+            status="failed",
+            error_message=str(e)
+        )
 
 
 @app.post("/analyze")
@@ -465,7 +621,7 @@ async def analyze_document(
     os.makedirs(workdir, exist_ok=True)
 
     try:
-        local_path = os.path.join(workdir, file.filename or "input")
+        local_path = os.path.join(workdir, os.path.basename(file.filename or "input"))
 
         with open(local_path, "wb") as f:
             content = await file.read()

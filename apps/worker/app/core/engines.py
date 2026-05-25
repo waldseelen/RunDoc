@@ -159,12 +159,15 @@ class EngineRouter:
         return available
 
     @classmethod
-    def select_pdf_engine(cls, preferred: Optional[str] = None) -> str:
+    def select_pdf_engine(cls, preferred: Optional[str] = None) -> Optional[str]:
         """
         PDF motoru seçer. Tercih edilen motor yoksa veya kullanılamıyorsa
         yedek motora düşer.
 
-        Yedek sırası: preferred → xelatex → typst → weasyprint → pdflatex
+        Yedek sırası: preferred → xelatex → typst → weasyprint → pdflatex → None (HTML fallback)
+        
+        Returns:
+            Engine name veya None (HTML çıkışına fallback yapılmalı)
         """
         fallback_order = ["xelatex", "typst", "weasyprint", "pdflatex", "lualatex", "tectonic"]
 
@@ -181,9 +184,12 @@ class EngineRouter:
                 logger.info(f"PDF motoru seçildi: {engine_name}")
                 return engine_name
 
-        raise RuntimeError(
-            "Hiçbir PDF motoru bulunamadı. TeX Live, Typst veya WeasyPrint kurulu olmalıdır."
+        # PDF motorları bulunamadıysa uyarı ver ama None döndür (HTML fallback'e izin ver)
+        logger.warning(
+            "Hiçbir PDF motoru bulunamadı. TeX Live, Typst veya WeasyPrint kurulu olmalıdır. "
+            "Fallback: HTML çıkışı kullanılacak."
         )
+        return None
 
     @classmethod
     def select_slide_engine(cls, preferred: Optional[str] = None) -> str:

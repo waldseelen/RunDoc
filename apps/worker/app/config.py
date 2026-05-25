@@ -20,8 +20,11 @@ class Settings:
     )
 
     # Worker
+    worker_api_url: str = field(
+        default_factory=lambda: os.getenv("WORKER_API_URL", "http://localhost:8000")
+    )
     worker_temp_dir: str = field(
-        default_factory=lambda: os.getenv("WORKER_TEMP_DIR", "/tmp/pandoc-workdir")
+        default_factory=lambda: os.getenv("WORKER_TEMP_DIR", os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))), "temp_workdir"))
     )
     max_timeout: int = field(
         default_factory=lambda: int(os.getenv("WORKER_MAX_TIMEOUT", "120"))

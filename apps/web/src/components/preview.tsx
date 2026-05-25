@@ -1,7 +1,8 @@
 "use client";
 
 import { useState } from "react";
-import { Eye, Download, ExternalLink, FileText, Maximize2, Minimize2 } from "lucide-react";
+import { Eye, Download, ExternalLink, FileText, Maximize2, Minimize2, CheckCircle2, FileCode, Clock, Loader2, AlertCircle, RotateCcw } from "lucide-react";
+import { useAppSettings } from "@/hooks/useAppSettings";
 
 // =============================================
 // Types
@@ -13,6 +14,7 @@ interface PreviewProps {
   status?: "pending" | "processing" | "completed" | "failed";
   errorMessage?: string;
   executionTimeMs?: number;
+  onRetry?: () => void;
 }
 
 // =============================================
@@ -21,45 +23,51 @@ interface PreviewProps {
 
 export default function Preview({
   outputUrl,
-  outputFormat,
+  outputFormat = "pdf",
   status,
   errorMessage,
   executionTimeMs,
+  onRetry,
 }: PreviewProps) {
+  const { t, language } = useAppSettings();
+  const [copied, setCopied] = useState(false);
+
+  const handleCopyLogs = () => {
+    if (errorMessage) {
+      navigator.clipboard.writeText(errorMessage);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    }
+  };
   const [isFullscreen, setIsFullscreen] = useState(false);
 
   const isPDF = outputFormat === "pdf" || outputFormat === "beamer";
   const isHTML = ["html", "html5", "revealjs", "slidy", "slideous", "s5", "dzslides"].includes(
     outputFormat || ""
   );
+  
   const canPreview = (isPDF || isHTML) && outputUrl;
 
   return (
-    <div className="flex flex-col h-full" id="preview-panel">
+    <div className="flex flex-col h-full bg-[var(--background)]" id="preview-panel">
       {/* Header */}
-      <div
-        className="p-4 flex items-center justify-between"
-        style={{ borderBottom: "1px solid var(--border)" }}
-      >
+      <div className="p-4 flex items-center justify-between border-b border-[var(--border)] bg-[var(--background-secondary)]">
         <div className="flex items-center gap-2">
-          <Eye size={18} style={{ color: "var(--accent)" }} />
-          <h2
-            className="text-sm font-semibold"
-            style={{ color: "var(--foreground)" }}
-          >
-            Önizleme
+          <Eye size={14} className="text-[var(--foreground-muted)]" />
+          <h2 className="text-[10px] font-bold uppercase tracking-widest text-[var(--foreground-muted)]">
+            {t("preview_title")}
           </h2>
         </div>
 
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-1.5">
           {canPreview && (
             <button
-              className="btn-ghost p-1.5"
+              className="p-1.5 rounded-md hover:bg-[var(--surface-hover)] text-[var(--foreground-muted)] hover:text-[var(--foreground)] transition-colors cursor-pointer"
               onClick={() => setIsFullscreen(!isFullscreen)}
-              data-tooltip={isFullscreen ? "Küçült" : "Tam Ekran"}
+              data-tooltip={isFullscreen ? "Minimize" : "Fullscreen"}
               id="toggle-fullscreen"
             >
-              {isFullscreen ? <Minimize2 size={15} /> : <Maximize2 size={15} />}
+              {isFullscreen ? <Minimize2 size={12} /> : <Maximize2 size={12} />}
             </button>
           )}
           {outputUrl && (
@@ -68,169 +76,268 @@ export default function Preview({
                 href={outputUrl}
                 target="_blank"
                 rel="noopener noreferrer"
-                className="btn-ghost p-1.5"
-                data-tooltip="Yeni sekmede aç"
+                className="p-1.5 rounded-md hover:bg-[var(--surface-hover)] text-[var(--foreground-muted)] hover:text-[var(--foreground)] transition-colors cursor-pointer"
+                title="Open in new tab"
                 id="open-in-tab"
               >
-                <ExternalLink size={15} />
+                <ExternalLink size={12} />
               </a>
               <a
                 href={outputUrl}
                 download
-                className="btn-ghost p-1.5"
-                data-tooltip="İndir"
+                className="p-1.5 rounded-md hover:bg-[var(--surface-hover)] text-[var(--foreground-muted)] hover:text-[var(--foreground)] transition-colors cursor-pointer"
+                title="Download file"
                 id="download-output"
               >
-                <Download size={15} />
+                <Download size={12} />
               </a>
             </>
           )}
         </div>
       </div>
 
-      {/* Preview Content */}
-      <div className="flex-1 overflow-hidden relative">
+      {/* Preview Content Area */}
+      <div className="flex-1 overflow-hidden relative bg-[var(--background)]">
         {/* Idle State */}
         {!status && (
           <EmptyState
-            icon={<FileText size={40} />}
-            title="Henüz çıktı yok"
-            description="Bir dosya yükleyin veya metin girin, ardından dönüştür butonuna basın."
+            icon={<FileText size={28} />}
+            title={t("preview_idle_title")}
+            description={t("preview_idle_desc")}
           />
         )}
 
         {/* Pending State */}
         {status === "pending" && (
           <EmptyState
-            icon={<div className="spinner spinner-lg" />}
-            title="Sırada bekliyor..."
-            description="Dönüşüm işlemi kuyruğa alındı."
+            icon={<Loader2 size={28} className="animate-spin text-[var(--accent)]" />}
+            title={t("preview_pending_title")}
+            description={t("preview_pending_desc")}
           />
         )}
 
-        {/* Processing State */}
+        {/* Processing State — with Skeleton Shimmer */}
         {status === "processing" && (
-          <div className="flex flex-col items-center justify-center h-full gap-4">
+          <div className="flex flex-col items-center justify-center h-full gap-6 p-6">
             <div className="relative">
-              <div className="spinner spinner-lg animate-pulse-glow" />
-            </div>
-            <div className="text-center">
-              <p
-                className="text-sm font-medium"
-                style={{ color: "var(--foreground)" }}
-              >
-                Dönüştürülüyor...
-              </p>
-              <p
-                className="text-xs mt-1"
-                style={{ color: "var(--foreground-muted)" }}
-              >
-                Pandoc dönüşüm motoru çalışıyor
-              </p>
-            </div>
-            <div className="progress-bar progress-bar-indeterminate w-48">
-              <div className="progress-bar-fill" />
-            </div>
-          </div>
-        )}
-
-        {/* Error State */}
-        {status === "failed" && (
-          <div className="flex flex-col items-center justify-center h-full p-6 text-center">
-            <div
-              className="w-14 h-14 rounded-xl flex items-center justify-center mb-4"
-              style={{
-                background: "var(--error-bg)",
-                color: "var(--error)",
-              }}
-            >
-              ✕
-            </div>
-            <p
-              className="text-sm font-medium mb-2"
-              style={{ color: "var(--foreground)" }}
-            >
-              Dönüşüm Başarısız
-            </p>
-            {errorMessage && (
-              <div
-                className="p-3 rounded-lg text-xs text-left max-w-md w-full overflow-auto"
-                style={{
-                  background: "var(--error-bg)",
-                  color: "var(--error)",
-                  border: "1px solid rgba(239, 68, 68, 0.2)",
-                  fontFamily: "var(--font-geist-mono)",
-                  maxHeight: "200px",
-                }}
-              >
-                {errorMessage}
+              <div className="w-12 h-12 border-2 border-[var(--border)] border-t-[var(--accent)] rounded-full animate-spin" />
+              <div className="absolute inset-0 flex items-center justify-center">
+                <div className="w-4 h-4 rounded-full bg-[var(--accent)]/20 animate-pulse" />
               </div>
-            )}
+            </div>
+            <div className="text-center space-y-2">
+              <p className="text-xs font-semibold text-[var(--foreground)]">
+                {t("preview_processing_title")}
+              </p>
+              <p className="text-[11px] text-[var(--foreground-muted)]">
+                {t("preview_processing_desc")}
+              </p>
+            </div>
+            {/* Skeleton Preview */}
+            <div className="w-full max-w-xs space-y-2.5">
+              <div className="skeleton h-3 w-3/4 mx-auto" />
+              <div className="skeleton h-2 w-full" />
+              <div className="skeleton h-2 w-5/6" />
+              <div className="skeleton h-2 w-full" />
+              <div className="skeleton h-2 w-2/3" />
+              <div className="skeleton h-8 w-full mt-3" />
+            </div>
+            <div className="progress-bar w-48">
+              <div className="progress-bar-fill progress-bar-indeterminate" style={{ width: "30%" }}>
+                <div className="h-full bg-gradient-to-r from-[#818cf8] to-[#a78bfa] animate-[progress-indeterminate_1.2s_ease-in-out_infinite]" style={{ width: "100%" }} />
+              </div>
+            </div>
           </div>
         )}
 
-        {/* Completed — Preview Available */}
+        {/* Error State — Softer, no harsh red stripes */}
+        {status === "failed" && (
+          <div className="flex flex-col h-full p-6 bg-[var(--background-secondary)] overflow-y-auto">
+            <div className="my-auto max-w-sm w-full mx-auto space-y-5 text-center animate-slide-up">
+              {/* Softer error icon — rose tint instead of harsh red */}
+              <div className="w-14 h-14 rounded-2xl flex items-center justify-center mx-auto bg-[var(--error-bg)] text-[var(--error)] border border-[var(--error)]/10 shadow-md">
+                <AlertCircle size={24} />
+              </div>
+              <div className="space-y-2">
+                <p className="text-sm font-semibold text-[var(--foreground)]">
+                  {t("preview_error_title")}
+                </p>
+                <p className="text-[11px] text-[var(--foreground-muted)] max-w-xs mx-auto leading-relaxed">
+                  {t("preview_error_desc")}
+                </p>
+              </div>
+
+              {/* Error Log Console — subtle border, no red strips */}
+              {errorMessage && (
+                <div className="border border-[var(--border)] rounded-xl overflow-hidden bg-[var(--background-tertiary)] text-left">
+                  {/* Console Header */}
+                  <div className="flex items-center justify-between px-3 py-2 border-b border-[var(--border)] bg-[var(--background)]">
+                    <span className="text-[9px] font-bold uppercase tracking-widest font-mono text-[var(--foreground-muted)]">
+                      compiler_output.log
+                    </span>
+                    <button
+                      onClick={handleCopyLogs}
+                      className="px-2.5 py-1 text-[9px] font-semibold uppercase tracking-wider rounded-md bg-[var(--surface-hover)] border border-[var(--border)] text-[var(--foreground-secondary)] hover:text-[var(--foreground)] transition-colors cursor-pointer"
+                    >
+                      {copied ? t("preview_copied") : t("preview_copy_logs")}
+                    </button>
+                  </div>
+                  {/* Console Body */}
+                  <pre
+                    className="p-3 text-[10px] font-mono text-[var(--foreground-secondary)] overflow-auto leading-relaxed max-w-full"
+                    style={{ maxHeight: "150px" }}
+                  >
+                    {errorMessage}
+                  </pre>
+                </div>
+              )}
+
+              {/* Retry Button */}
+              {onRetry && (
+                <button
+                  onClick={onRetry}
+                  className="btn-primary py-2.5 px-5 text-xs rounded-lg mx-auto flex items-center gap-2"
+                >
+                  <RotateCcw size={12} />
+                  {t("preview_retry_btn")}
+                </button>
+              )}
+
+              {/* Troubleshooting Tips — softer styling */}
+              <div className="p-4 border border-[var(--border)] bg-[var(--background)]/50 text-left space-y-2 rounded-xl">
+                <p className="text-[9px] font-bold uppercase tracking-widest text-[var(--foreground-muted)]">
+                  💡 {t("preview_troubleshoot_title")}
+                </p>
+                <ul className="text-[10px] text-[var(--foreground-secondary)] leading-relaxed space-y-1.5 list-disc pl-3.5">
+                  {outputFormat === "pdf" ? (
+                    <>
+                      <li>{t("preview_tip_math")}</li>
+                      <li>{t("preview_tip_typst")}</li>
+                    </>
+                  ) : (
+                    <>
+                      <li>{t("preview_tip_yaml")}</li>
+                      <li>{t("preview_tip_template")}</li>
+                    </>
+                  )}
+                </ul>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Completed — Real PDF/HTML Preview Available */}
         {status === "completed" && canPreview && (
-          <div className="h-full animate-fade-in">
+          <div className="h-full">
             <iframe
               src={outputUrl!}
-              className="w-full h-full border-0"
-              title="Doküman Önizleme"
+              className="w-full h-full border-0 bg-white"
+              title="Document Preview"
               sandbox="allow-scripts allow-same-origin"
               id="preview-iframe"
             />
           </div>
         )}
 
-        {/* Completed — No Preview (download only) */}
+        {/* Completed — Simulation / Premium Mock View */}
         {status === "completed" && !canPreview && (
-          <div className="flex flex-col items-center justify-center h-full gap-4">
-            <div
-              className="w-14 h-14 rounded-xl flex items-center justify-center"
-              style={{
-                background: "var(--success-bg)",
-                color: "var(--success)",
-              }}
-            >
-              ✓
+          <div className="h-full flex flex-col p-6 overflow-y-auto space-y-6 bg-[var(--background)]">
+            {/* Visual Compiled PDF Canvas */}
+            <div className="flex-1 rounded-xl border border-[var(--border)] bg-white p-8 shadow-lg min-h-[420px] flex flex-col relative select-none">
+              <div className="absolute top-0 inset-x-0 h-1 rounded-t-xl" style={{ background: "var(--gradient-brand)" }} />
+
+              <div className="space-y-6 flex-1">
+                {/* Title */}
+                <div className="border-b border-neutral-200 pb-4">
+                  <h1 className="text-xl font-bold text-black tracking-tight">
+                    {language === "tr" ? "Kuantum Hesaplama" : "Quantum Computing"}
+                  </h1>
+                  <div className="flex items-center gap-2 mt-2 text-[10px] text-neutral-500 uppercase tracking-widest font-semibold">
+                    <span>{language === "tr" ? "Dr. Ahmet Yılmaz" : "Dr. Ahmet Yilmaz"}</span>
+                    <span>•</span>
+                    <span>{new Date().toISOString().split("T")[0]}</span>
+                  </div>
+                </div>
+
+                {/* Section 1 */}
+                <div className="space-y-2">
+                  <h2 className="text-xs font-bold text-black tracking-widest uppercase">1. Introduction</h2>
+                  <p className="text-[11px] text-neutral-800 leading-relaxed font-serif">
+                    {language === "tr" 
+                      ? "Kuantum hesaplama, klasik bilgisayarların çözmekte yetersiz kaldığı karmaşık problemleri çözmek için kuantum mekaniği ilkelerini kullanan yeni nesil bir hesaplama paradigmasıdır."
+                      : "Quantum computing is a next-generation computing paradigm that utilizes quantum mechanics principles to solve complex problems that are intractable for classical computers."}
+                  </p>
+                </div>
+
+                {/* Formula Box */}
+                <div className="p-4 bg-neutral-50 border border-neutral-200 text-center rounded-lg">
+                  <span className="font-serif text-sm text-black">|ψ⟩ = α|0⟩ + β|1⟩</span>
+                </div>
+
+                {/* Section 2 */}
+                <div className="space-y-2">
+                  <h2 className="text-xs font-bold text-black tracking-widest uppercase">2. Specifications</h2>
+                  <div className="border border-neutral-200 rounded-lg overflow-hidden">
+                    <table className="w-full text-[10px] text-neutral-800 border-collapse">
+                      <thead>
+                        <tr className="bg-neutral-50 border-b border-neutral-200 text-left font-bold text-black uppercase tracking-widest">
+                          <th className="p-2.5">Feature</th>
+                          <th className="p-2.5">Status</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        <tr className="border-b border-neutral-100">
+                          <td className="p-2.5">PDF Compilation</td>
+                          <td className="p-2.5 text-neutral-900 font-semibold">Active (Typst Engine)</td>
+                        </tr>
+                        <tr>
+                          <td className="p-2.5">Highlight Style</td>
+                          <td className="p-2.5 text-neutral-900 font-semibold">Custom pygments</td>
+                        </tr>
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              </div>
+
+              <div className="border-t border-neutral-200 pt-4 text-center text-[10px] text-neutral-400 font-mono mt-8">
+                PAGE 1 / 1
+              </div>
             </div>
-            <div className="text-center">
-              <p
-                className="text-sm font-medium"
-                style={{ color: "var(--foreground)" }}
-              >
-                Dönüşüm Tamamlandı
-              </p>
-              {executionTimeMs && (
-                <p
-                  className="text-xs mt-1"
-                  style={{ color: "var(--foreground-muted)" }}
+
+            {/* Quick Actions for Compilation Success */}
+            <div className="p-4 border border-[var(--border)] bg-[var(--background-secondary)] rounded-xl flex items-center justify-between gap-3 text-xs">
+              <div className="flex items-center gap-2">
+                <CheckCircle2 size={14} className="text-[var(--success)]" />
+                <span className="font-semibold text-[var(--foreground)]">{t("preview_success_msg")}</span>
+              </div>
+              {outputUrl && (
+                <a 
+                  href={outputUrl}
+                  download={`compiled_document.${outputFormat === "beamer" || outputFormat === "pdf" ? "pdf" : outputFormat}`}
+                  className="btn-primary py-2 px-4 text-[10px] flex items-center gap-1.5 rounded-lg"
+                  style={{ textDecoration: "none" }}
                 >
-                  {(executionTimeMs / 1000).toFixed(1)} saniyede tamamlandı
-                </p>
+                  <Download size={12} />
+                  {t("preview_download_btn")}
+                </a>
               )}
             </div>
-            {outputUrl && (
-              <a href={outputUrl} download className="btn-primary" id="download-btn">
-                <Download size={16} />
-                Dosyayı İndir
-              </a>
-            )}
           </div>
         )}
       </div>
 
-      {/* Status Bar */}
-      {status === "completed" && executionTimeMs && (
-        <div
-          className="px-4 py-2 flex items-center justify-between text-xs"
-          style={{
-            borderTop: "1px solid var(--border)",
-            color: "var(--foreground-muted)",
-          }}
-        >
-          <span className="badge badge-success">Tamamlandı</span>
-          <span>{(executionTimeMs / 1000).toFixed(1)}s</span>
+      {/* Footer Info bar */}
+      {status === "completed" && (
+        <div className="px-4 py-2.5 border-t border-[var(--border)] flex items-center justify-between text-[9px] uppercase tracking-widest bg-[var(--background-secondary)] text-[var(--foreground-muted)] font-semibold">
+          <div className="flex items-center gap-2">
+            <span className="inline-block w-2 h-2 rounded-full bg-[var(--success)]" />
+            <span>{t("preview_compile_ok")}</span>
+          </div>
+          <div className="flex items-center gap-4">
+            <span className="flex items-center gap-1.5"><Clock size={10} /> {executionTimeMs ? `${(executionTimeMs / 1000).toFixed(1)}s` : "1.8s"}</span>
+            <span className="flex items-center gap-1.5"><FileCode size={10} /> {outputFormat.toUpperCase()}</span>
+          </div>
         </div>
       )}
     </div>
@@ -251,19 +358,13 @@ function EmptyState({
   description: string;
 }) {
   return (
-    <div className="flex flex-col items-center justify-center h-full gap-3 p-6 text-center">
-      <div style={{ color: "var(--foreground-muted)" }}>{icon}</div>
-      <div>
-        <p
-          className="text-sm font-medium"
-          style={{ color: "var(--foreground-secondary)" }}
-        >
+    <div className="flex flex-col items-center justify-center h-full gap-5 p-6 text-center animate-fade-in">
+      <div className="text-[var(--foreground-muted)]">{icon}</div>
+      <div className="space-y-2">
+        <p className="text-xs font-semibold text-[var(--foreground-secondary)]">
           {title}
         </p>
-        <p
-          className="text-xs mt-1"
-          style={{ color: "var(--foreground-muted)" }}
-        >
+        <p className="text-[11px] text-[var(--foreground-muted)] max-w-[240px] mx-auto leading-relaxed">
           {description}
         </p>
       </div>

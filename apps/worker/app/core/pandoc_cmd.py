@@ -136,8 +136,8 @@ class PandocCommandBuilder:
 
     def enable_smart_typography(self) -> "PandocCommandBuilder":
         """Akıllı tipografiyi aktifleştirir (düz tırnaklar → eğri tırnaklar)."""
-        # Pandoc 2.x+ sürümlerinde --smart yerine +smart extension kullanılır
-        # Ancak standalone modunda varsayılan olarak aktiftir
+        # Pandoc 3.x+ sürümlerinde --smart parametresi kaldırılmıştır.
+        # Bu yüzden --smart parametresini listede tutup build() aşamasında dinamik olarak +smart uzantısına çeviriyoruz.
         self._options.append("--smart")
         return self
 
@@ -209,7 +209,34 @@ class PandocCommandBuilder:
         """Tam komutu döndürür (çalıştırmadan)."""
         cmd = list(self._cmd)
         cmd.extend(self._input_files)
-        cmd.extend(self._options)
+        
+        # Pandoc 3.x+ smart typography (--smart kaldırıldı, +smart uzantısı kullanılmalı)
+        options = []
+        has_smart = False
+        from_format = None
+        
+        for opt in self._options:
+            if opt == "--smart":
+                has_smart = True
+            elif opt.startswith("--from="):
+                from_format = opt.split("=", 1)[1]  # Correctly extract format
+                options.append(opt)
+            else:
+                options.append(opt)
+                
+        # Smart typography işleme (Pandoc 3.x+ uyumluluğu)
+        if has_smart:
+            if from_format and not from_format.endswith("+smart"):
+                # Mevcut from format'ına +smart ekle
+                for i, opt in enumerate(options):
+                    if opt.startswith("--from="):
+                        options[i] = f"--from={from_format}+smart"
+                        break
+            elif not from_format:
+                # --from belirtilmemişse varsayılan markdown+smart ekle
+                options.append("--from=markdown+smart")
+                
+        cmd.extend(options)
         cmd.extend(["-o", self.output_path])
         return cmd
 

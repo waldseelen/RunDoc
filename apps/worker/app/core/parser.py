@@ -1,19 +1,16 @@
 """
 Pandoc Orchestrator — AST Parser & Format Analyzer
 Girdi dosyalarını analiz eder, format algılar, YAML front-matter çıkarır.
+Performans optimizasyonlu ve ReDoS (Regex Backtracking) korumalı mimari.
 """
 
 import json
 import subprocess
 import logging
-import re
 from typing import Optional, Dict, Any, List
 from pathlib import Path
 
-from app.config import settings
-
 logger = logging.getLogger(__name__)
-
 
 # Dosya uzantısına göre format eşleme
 EXTENSION_FORMAT_MAP: Dict[str, str] = {
@@ -74,6 +71,7 @@ class DocumentParser:
         Returns:
             dict: Pandoc JSON AST yapısı veya hata durumunda None
         """
+        from app.config import settings
         cmd = [settings.pandoc_path]
 
         if input_format:
@@ -101,30 +99,32 @@ class DocumentParser:
     @staticmethod
     def extract_yaml_metadata(file_path: str) -> Dict[str, Any]:
         """
-        Markdown dosyasından YAML front-matter bloğunu çıkarır.
-
-        Desteklenen format:
-        ---
-        title: Başlık
-        author: Yazar
-        date: 2026-01-01
-        ---
+        ReDoS (Regex Denial of Service) zafiyetlerinden arındırılmış, 
+        yüksek hızlı satır bazlı YAML front-matter ayrıştırıcısı.
         """
         metadata: Dict[str, Any] = {}
 
         try:
-            with open(file_path, "r", encoding="utf-8") as f:
-                content = f.read()
+            if not os.path.exists(file_path):
+                return metadata
 
-            # YAML front-matter bloğunu bul
-            yaml_match = re.match(r'^---\s*\n(.*?)\n---\s*\n', content, re.DOTALL)
+            with open(file_path, "r", encoding="utf-8", errors="ignore") as f:
+                lines = f.readlines()
 
-            if yaml_match:
-                yaml_block = yaml_match.group(1)
+            if not lines:
+                return metadata
 
-                # Basit YAML ayrıştırma (karmaşık yapılar için PyYAML kullanılmalı)
-                for line in yaml_block.strip().split("\n"):
-                    line = line.strip()
+            # Dosyanın ilk satırı geçerli bir YAML başlangıcı mı? (---)
+            if lines[0].strip() == "---":
+                yaml_lines = []
+                for line in lines[1:]:
+                    stripped = line.strip()
+                    if stripped == "---":
+                        break
+                    yaml_lines.append(stripped)
+
+                # Satırları ayrıştır
+                for line in yaml_lines:
                     if ":" in line and not line.startswith("#"):
                         key, _, value = line.partition(":")
                         key = key.strip()
@@ -134,8 +134,6 @@ class DocumentParser:
 
                 logger.info(f"YAML metadata çıkarıldı: {list(metadata.keys())}")
 
-        except FileNotFoundError:
-            logger.error(f"Dosya bulunamadı: {file_path}")
         except Exception as e:
             logger.error(f"Metadata çıkarma hatası: {e}")
 
@@ -144,20 +142,8 @@ class DocumentParser:
     @staticmethod
     def analyze_content(file_path: str) -> Dict[str, Any]:
         """
-        Doküman içeriğini analiz eder.
-
-        Returns:
-            dict: {
-                "has_math": bool,
-                "has_citations": bool,
-                "has_code_blocks": bool,
-                "has_tables": bool,
-                "has_images": bool,
-                "heading_count": int,
-                "max_heading_level": int,
-                "word_count": int,
-                "languages_detected": list  # kod blokları için
-            }
+        ReDoS ve katlanarak artan zaman karmaşıklıklarından (backtracking) kaçınmak üzere 
+        lineer O(N) zaman karmaşıklığıyla doküman içeriğini analiz eder.
         """
         analysis = {
             "has_math": False,
@@ -172,49 +158,70 @@ class DocumentParser:
         }
 
         try:
-            with open(file_path, "r", encoding="utf-8") as f:
+            if not os.path.exists(file_path):
+                return analysis
+
+            with open(file_path, "r", encoding="utf-8", errors="ignore") as f:
                 content = f.read()
 
-            # Matematik ifadeleri ($...$, $$...$$, \(...\), \[...\])
-            analysis["has_math"] = bool(
-                re.search(r'\$[^$]+\$|\$\$[^$]+\$\$|\\\(.*?\\\)|\\\[.*?\\\]', content)
-            )
+            if not content:
+                return analysis
 
-            # Atıflar (@cite_key, [@key], \cite{key})
-            analysis["has_citations"] = bool(
-                re.search(r'@[\w:-]+|\[@[\w:-]+\]|\\cite\{[\w,]+\}', content)
-            )
+            # 1. Hızlı string taramaları (ReDoS Koruması)
+            analysis["has_math"] = "$" in content or "\\(" in content or "\\[" in content
+            analysis["has_citations"] = "@" in content or "\\cite" in content
+            analysis["has_code_blocks"] = "```" in content
+            analysis["has_images"] = "![" in content
 
-            # Kod blokları (```)
-            code_blocks = re.findall(r'```(\w*)', content)
-            analysis["has_code_blocks"] = len(code_blocks) > 0
-            analysis["languages_detected"] = list(set(
-                lang for lang in code_blocks if lang
-            ))
+            # 2. Kelime Sayısı Hesaplama (Basit ve hızlı)
+            # YAML bloğunu çıkararak kelime sayısını bulalım
+            lines = content.splitlines()
+            body_start_idx = 0
+            if lines and lines[0].strip() == "---":
+                for idx, line in enumerate(lines[1:], start=1):
+                    if line.strip() == "---":
+                        body_start_idx = idx + 1
+                        break
 
-            # Tablolar (| --- |)
-            analysis["has_tables"] = bool(
-                re.search(r'\|.*\|.*\n\|[\s-:|]+\|', content)
-            )
+            body_lines = lines[body_start_idx:]
+            total_words = 0
+            min_heading = 7
 
-            # Görseller (![alt](url))
-            analysis["has_images"] = bool(
-                re.search(r'!\[.*?\]\(.*?\)', content)
-            )
+            # Lineer O(N) dikey satır analizi
+            in_code_block = False
+            for idx, line in enumerate(body_lines):
+                stripped = line.strip()
+                total_words += len(stripped.split())
 
-            # Başlıklar
-            headings = re.findall(r'^(#{1,6})\s', content, re.MULTILINE)
-            analysis["heading_count"] = len(headings)
-            if headings:
-                analysis["max_heading_level"] = min(len(h) for h in headings)
+                # Kod blok dilleri toplama
+                if stripped.startswith("```"):
+                    in_code_block = not in_code_block
+                    if in_code_block:
+                        lang = stripped[3:].strip()
+                        if lang and lang not in analysis["languages_detected"]:
+                            analysis["languages_detected"].append(lang)
+                    continue
 
-            # Kelime sayısı (yaklaşık)
-            # YAML front-matter hariç
-            text_content = re.sub(r'^---\s*\n.*?\n---\s*\n', '', content, flags=re.DOTALL)
-            analysis["word_count"] = len(text_content.split())
+                # Başlıkları topla
+                if not in_code_block and stripped.startswith("#"):
+                    parts = stripped.split(None, 1)
+                    if parts:
+                        hashes = parts[0]
+                        if all(char == "#" for char in hashes) and len(hashes) <= 6:
+                            analysis["heading_count"] += 1
+                            min_heading = min(min_heading, len(hashes))
 
-        except FileNotFoundError:
-            logger.error(f"Dosya bulunamadı: {file_path}")
+                # Tablo tespiti: bir satırda | varsa ve sonraki satır tablo ayırıcıysa (-|-)
+                if not in_code_block and "|" in stripped:
+                    if idx + 1 < len(body_lines):
+                        next_line = body_lines[idx + 1].strip()
+                        if "|" in next_line and ("-" in next_line or ":" in next_line):
+                            analysis["has_tables"] = True
+
+            analysis["word_count"] = total_words
+            if analysis["heading_count"] > 0:
+                analysis["max_heading_level"] = min_heading
+
         except Exception as e:
             logger.error(f"İçerik analizi hatası: {e}")
 
@@ -224,9 +231,6 @@ class DocumentParser:
     def suggest_conversion_options(analysis: Dict[str, Any], target_format: str) -> Dict[str, Any]:
         """
         İçerik analizine dayalı olarak önerilen dönüşüm seçeneklerini döndürür.
-
-        Returns:
-            dict: Önerilen Pandoc parametreleri
         """
         suggestions: Dict[str, Any] = {
             "standalone": True,
@@ -238,9 +242,9 @@ class DocumentParser:
             if target_format in ("html", "html5", "revealjs", "slidy"):
                 suggestions["math_rendering"] = "mathjax"
             elif target_format in ("pdf", "latex", "beamer"):
-                suggestions["math_rendering"] = "native"  # LaTeX doğal destek
+                suggestions["math_rendering"] = "native"
             else:
-                suggestions["math_rendering"] = "webtex"  # SVG fallback
+                suggestions["math_rendering"] = "webtex"
 
         # Atıf varsa → citeproc aktifleştir
         if analysis.get("has_citations"):
@@ -267,3 +271,4 @@ class DocumentParser:
                 suggestions["engine"] = "typst"
 
         return suggestions
+import os

@@ -63,7 +63,7 @@ export default function CodeEditor({
     editorRef.current = editor;
     setIsReady(true);
 
-    // Custom dark theme
+    // Custom dark theme — softer, no harsh red error markers
     monaco.editor.defineTheme("rundoc-dark", {
       base: "vs-dark",
       inherit: true,
@@ -76,7 +76,7 @@ export default function CodeEditor({
         { token: "function", foreground: "c084fc" },
         { token: "variable", foreground: "e8eaed" },
         { token: "constant", foreground: "fb923c" },
-        { token: "tag", foreground: "f87171" },
+        { token: "tag", foreground: "818cf8" },
         { token: "attribute.name", foreground: "818cf8" },
         { token: "attribute.value", foreground: "34d399" },
         // Markdown specific
@@ -86,23 +86,43 @@ export default function CodeEditor({
         { token: "markup.inline", foreground: "fb923c" },
       ],
       colors: {
-        "editor.background": "#0f1117",
-        "editor.foreground": "#e8eaed",
-        "editor.lineHighlightBackground": "#1a1d2610",
-        "editor.selectionBackground": "#6366f130",
-        "editor.inactiveSelectionBackground": "#6366f115",
-        "editorCursor.foreground": "#6366f1",
-        "editorLineNumber.foreground": "#3a3d4a",
-        "editorLineNumber.activeForeground": "#6b7280",
-        "editorIndentGuide.background": "#1f2230",
-        "editorIndentGuide.activeBackground": "#2a2d3a",
-        "editor.selectionHighlightBackground": "#6366f115",
-        "editorBracketMatch.background": "#6366f120",
-        "editorBracketMatch.border": "#6366f140",
+        "editor.background": "#0c0c16",
+        "editor.foreground": "#f0f0f5",
+        "editor.lineHighlightBackground": "#ffffff05",
+        "editor.selectionBackground": "#5e61e633",
+        "editor.inactiveSelectionBackground": "#5e61e615",
+        "editorCursor.foreground": "#818cf8",
+        "editorLineNumber.foreground": "#2a2a42",
+        "editorLineNumber.activeForeground": "#9d9db5",
+        "editorIndentGuide.background": "rgba(255, 255, 255, 0.04)",
+        "editorIndentGuide.activeBackground": "rgba(255, 255, 255, 0.08)",
+        "editor.selectionHighlightBackground": "#5e61e615",
+        "editorBracketMatch.background": "#5e61e620",
+        "editorBracketMatch.border": "#5e61e640",
         "scrollbar.shadow": "#00000000",
-        "scrollbarSlider.background": "#2a2d3a60",
-        "scrollbarSlider.hoverBackground": "#3a3d4a80",
-        "scrollbarSlider.activeBackground": "#4a4d5a80",
+        "scrollbarSlider.background": "rgba(255, 255, 255, 0.04)",
+        "scrollbarSlider.hoverBackground": "rgba(255, 255, 255, 0.07)",
+        "scrollbarSlider.activeBackground": "rgba(255, 255, 255, 0.10)",
+        // ✅ Fix: Override error/warning marker colors — no red stripes
+        "editorError.foreground": "#fbbf24",
+        "editorWarning.foreground": "#fbbf24",
+        "editorInfo.foreground": "#60a5fa",
+        "editorError.border": "#00000000",
+        "editorWarning.border": "#00000000",
+        // ✅ Fix: Overview ruler colors — remove red strips
+        "editorOverviewRuler.errorForeground": "#00000000",
+        "editorOverviewRuler.warningForeground": "#00000000",
+        "editorOverviewRuler.infoForeground": "#00000000",
+        "editorOverviewRuler.border": "#00000000",
+        "editorOverviewRuler.background": "#00000000",
+        // ✅ Fix: Gutter/margin — no red decorations
+        "editorGutter.background": "#0c0c16",
+        "editorGutter.addedBackground": "#34d39940",
+        "editorGutter.modifiedBackground": "#60a5fa40",
+        "editorGutter.deletedBackground": "#fbbf2440",
+        // Minimap
+        "minimap.background": "#0c0c16",
+        "minimap.errorHighlight": "#fbbf2440",
       },
     });
 
@@ -126,7 +146,7 @@ export default function CodeEditor({
         >
           <div className="flex items-center gap-3">
             <div className="spinner" />
-            <span style={{ color: "var(--foreground-muted)", fontSize: "14px" }}>
+            <span style={{ color: "var(--foreground-muted)", fontSize: "13px" }}>
               Editör yükleniyor...
             </span>
           </div>
@@ -165,9 +185,13 @@ export default function CodeEditor({
           glyphMargin: false,
           lineDecorationsWidth: 8,
           lineNumbersMinChars: 3,
+          // ✅ Fix: Completely disable red overview ruler and error decorations
           overviewRulerLanes: 0,
           hideCursorInOverviewRuler: true,
           overviewRulerBorder: false,
+          renderValidationDecorations: "off" as any,
+          // Disable red squiggly underlines for markdown content
+          "semanticHighlighting.enabled": false as any,
         }}
       />
     </div>

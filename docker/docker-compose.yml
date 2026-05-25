@@ -1,0 +1,33 @@
+version: '3.8'
+
+services:
+  # Python FastAPI Worker
+  worker:
+    build:
+      context: ..
+      dockerfile: docker/worker.Dockerfile
+    container_name: pandoc-worker
+    ports:
+      - "8000:8000"
+    environment:
+      - WORKER_API_URL=http://localhost:8000
+      - WORKER_TEMP_DIR=/tmp/pandoc-workdir
+      - WORKER_MAX_TIMEOUT=120
+      - WORKER_MAX_FILE_SIZE_MB=50
+      - PANDOC_PATH=pandoc
+      - FIREBASE_SERVICE_ACCOUNT_PATH=/app/firebase-service-account.json
+      - FIREBASE_STORAGE_BUCKET=${FIREBASE_STORAGE_BUCKET}
+    volumes:
+      - /tmp/pandoc-workdir:/tmp/pandoc-workdir
+      - ./firebase-service-account.json:/app/firebase-service-account.json:ro
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 5s
+
+volumes:
+  pandoc-workdir:
+    driver: local
