@@ -17,9 +17,8 @@ export default function BrandLogo({ size = 32, className = "" }: BrandLogoProps)
     >
       <defs>
         <linearGradient id="logo-grad" x1="0%" y1="0%" x2="100%" y2="100%">
-          <stop offset="0%" stopColor="#5e61e6" />
-          <stop offset="50%" stopColor="#7c3aed" />
-          <stop offset="100%" stopColor="#9333ea" />
+          <stop offset="0%" stopColor="var(--accent)" />
+          <stop offset="100%" stopColor="var(--accent-hover)" />
         </linearGradient>
         <filter id="logo-glow" x="-20%" y="-20%" width="140%" height="140%">
           <feGaussianBlur stdDeviation="2" result="blur" />
@@ -33,8 +32,8 @@ export default function BrandLogo({ size = 32, className = "" }: BrandLogoProps)
         width="16"
         height="20"
         rx="3"
-        fill="#1a1a26"
-        stroke="rgba(255, 255, 255, 0.08)"
+        fill="var(--background-tertiary)"
+        stroke="var(--border)"
         strokeWidth="1.5"
       />
       {/* Active compiler layer shape */}

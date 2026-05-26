@@ -6,7 +6,6 @@ import {
   Settings2,
   ChevronDown,
   BookOpen,
-  Hash,
   Sparkles,
   Code2,
   FileType,

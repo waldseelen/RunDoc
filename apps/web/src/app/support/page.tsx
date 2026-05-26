@@ -30,7 +30,7 @@ export default function SupportPage() {
             <div className="space-y-2">
               <h2 className="text-xs font-bold uppercase tracking-widest text-[var(--foreground)]">Documentation</h2>
               <p className="text-[11px] text-[var(--foreground-secondary)] leading-relaxed">
-                Markdown'dan PDF oluşturma, LaTeX formül yazımı ve Pandoc filtre yapılandırması hakkında kapsamlı rehberlerimizi okuyun.
+                Markdown&apos;dan PDF oluşturma, LaTeX formül yazımı ve Pandoc filtre yapılandırması hakkında kapsamlı rehberlerimizi okuyun.
               </p>
               <Link href="/api-docs" className="text-[10px] font-semibold text-[var(--accent)] hover:underline">
                 API Dokümantasyonu →

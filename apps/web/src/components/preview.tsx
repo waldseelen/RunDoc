@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import { Eye, Download, ExternalLink, FileText, Maximize2, Minimize2, CheckCircle2, FileCode, Clock, Loader2, AlertCircle, RotateCcw } from "lucide-react";
 import { useAppSettings } from "@/hooks/useAppSettings";
 
@@ -31,27 +31,8 @@ export default function Preview({
 }: PreviewProps) {
   const { t, language } = useAppSettings();
   const [copied, setCopied] = useState(false);
-  const [progress, setProgress] = useState(0);
-
-  useEffect(() => {
-    if (status === "processing" || status === "pending") {
-      setProgress(5);
-      const interval = setInterval(() => {
-        setProgress((prev) => {
-          if (prev >= 92) {
-            return prev;
-          }
-          const increment = prev < 50 ? 8 : prev < 75 ? 4 : 1.5;
-          return Math.min(prev + increment, 95);
-        });
-      }, 250);
-      return () => clearInterval(interval);
-    } else if (status === "completed") {
-      setProgress(100);
-    } else {
-      setProgress(0);
-    }
-  }, [status]);
+  const progressWidth =
+    status === "completed" ? "100%" : status === "processing" || status === "pending" ? "65%" : "0%";
 
   const handleCopyLogs = () => {
     if (errorMessage) {
@@ -164,7 +145,7 @@ export default function Preview({
               <div className="skeleton h-8 w-full mt-3" />
             </div>
             <div className="progress-bar w-48">
-              <div className="progress-bar-fill" style={{ width: `${progress}%` }} />
+              <div className="progress-bar-fill" style={{ width: progressWidth }} />
             </div>
           </div>
         )}

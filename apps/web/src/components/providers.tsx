@@ -1,7 +1,7 @@
 "use client";
 
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { useState, type ReactNode } from "react";
+import { useEffect, useState, type ReactNode } from "react";
 
 export function Providers({ children }: { children: ReactNode }) {
   const [queryClient] = useState(
@@ -16,6 +16,19 @@ export function Providers({ children }: { children: ReactNode }) {
         },
       })
   );
+
+  useEffect(() => {
+    const handleRejection = (event: PromiseRejectionEvent) => {
+      const reason = event.reason as { type?: string };
+      if (reason && typeof reason === "object" && reason.type === "cancelation") {
+        event.preventDefault();
+        event.stopImmediatePropagation();
+      }
+    };
+
+    window.addEventListener("unhandledrejection", handleRejection, true);
+    return () => window.removeEventListener("unhandledrejection", handleRejection, true);
+  }, []);
 
   return (
     <QueryClientProvider client={queryClient}>{children}</QueryClientProvider>

@@ -3,7 +3,6 @@
 import { useCallback, useRef, useState } from "react";
 import {
   Upload,
-  FileText,
   X,
   AlertCircle,
 } from "lucide-react";

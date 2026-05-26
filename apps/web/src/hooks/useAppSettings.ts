@@ -10,14 +10,26 @@ export function useAppSettings() {
   const [language, setLanguage] = useState<Language>("tr");
   const [mounted, setMounted] = useState(false);
 
-  // Initialize values safely after mounting (avoids SSR mismatches)
+  const applyTheme = useCallback((newTheme: Theme) => {
+    if (typeof document === "undefined") return;
+    const root = document.documentElement;
+    if (newTheme === "light") {
+      root.classList.add("light");
+      root.setAttribute("data-theme", "light");
+    } else {
+      root.classList.remove("light");
+      root.removeAttribute("data-theme");
+    }
+  }, []);
+
+  // Initialize values safely after mounting (avoids SSR hydration mismatches)
   useEffect(() => {
     // 1. Detect & Apply Language
     const storedLang = localStorage.getItem("rundoc-language") as Language | null;
     if (storedLang === "tr" || storedLang === "en") {
       setLanguage(storedLang);
     } else {
-      const browserLang = typeof navigator !== "undefined" && navigator.language.startsWith("tr") ? "tr" : "en";
+      const browserLang = navigator.language.startsWith("tr") ? "tr" : "en";
       setLanguage(browserLang);
       localStorage.setItem("rundoc-language", browserLang);
     }
@@ -28,7 +40,7 @@ export function useAppSettings() {
       setTheme(storedTheme);
       applyTheme(storedTheme);
     } else {
-      const prefersDark = typeof window !== "undefined" && window.matchMedia("(prefers-color-scheme: dark)").matches;
+      const prefersDark = window.matchMedia("(prefers-color-scheme: dark)").matches;
       const initialTheme = prefersDark ? "dark" : "light";
       setTheme(initialTheme);
       applyTheme(initialTheme);
@@ -36,26 +48,14 @@ export function useAppSettings() {
     }
 
     setMounted(true);
-  }, []);
-
-  const applyTheme = (newTheme: Theme) => {
-    if (typeof document === "undefined") return;
-    const root = document.documentElement;
-    if (newTheme === "light") {
-      root.classList.add("light");
-      root.setAttribute("data-theme", "light");
-    } else {
-      root.classList.remove("light");
-      root.removeAttribute("data-theme");
-    }
-  };
+  }, [applyTheme]);
 
   const toggleTheme = useCallback(() => {
     const nextTheme = theme === "dark" ? "light" : "dark";
     setTheme(nextTheme);
     applyTheme(nextTheme);
     localStorage.setItem("rundoc-theme", nextTheme);
-  }, [theme]);
+  }, [applyTheme, theme]);
 
   const toggleLanguage = useCallback(() => {
     const nextLang = language === "tr" ? "en" : "tr";
@@ -77,3 +77,4 @@ export function useAppSettings() {
     mounted
   };
 }
+

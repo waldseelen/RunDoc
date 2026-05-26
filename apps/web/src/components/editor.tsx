@@ -1,7 +1,8 @@
 "use client";
 
-import { useRef, useCallback, useState } from "react";
-import Editor, { type OnMount } from "@monaco-editor/react";
+import { useRef, useCallback, useState, useEffect } from "react";
+import Editor, { type OnMount, useMonaco } from "@monaco-editor/react";
+import type { editor as MonacoEditor } from "monaco-editor";
 
 // =============================================
 // Types
@@ -13,6 +14,7 @@ interface CodeEditorProps {
   language?: string;
   readOnly?: boolean;
   height?: string;
+  theme?: "dark" | "light";
 }
 
 // =============================================
@@ -53,87 +55,146 @@ export default function CodeEditor({
   language = "markdown",
   readOnly = false,
   height = "100%",
+  theme = "dark",
 }: CodeEditorProps) {
-  const editorRef = useRef<any>(null);
+  const editorRef = useRef<MonacoEditor.IStandaloneCodeEditor | null>(null);
   const [isReady, setIsReady] = useState(false);
+  const monaco = useMonaco();
 
   const monacoLanguage = LANGUAGE_MAP[language] || "plaintext";
 
-  const handleMount: OnMount = useCallback((editor, monaco) => {
+  // Register themes when monaco is available
+  useEffect(() => {
+    if (monaco) {
+      // Dark Theme (Nordic Green)
+      monaco.editor.defineTheme("rundoc-dark", {
+        base: "vs-dark",
+        inherit: true,
+        rules: [
+          { token: "comment", foreground: "7b8a81", fontStyle: "italic" },
+          { token: "keyword", foreground: "3e8b6a" },
+          { token: "string", foreground: "49a67d" },
+          { token: "number", foreground: "d9a441" },
+          { token: "type", foreground: "4c7db3" },
+          { token: "function", foreground: "3e8b6a" },
+          { token: "variable", foreground: "e6efe8" },
+          { token: "constant", foreground: "d9a441" },
+          { token: "tag", foreground: "3e8b6a" },
+          { token: "attribute.name", foreground: "3e8b6a" },
+          { token: "attribute.value", foreground: "49a67d" },
+          { token: "markup.heading", foreground: "3e8b6a", fontStyle: "bold" },
+          { token: "markup.bold", fontStyle: "bold" },
+          { token: "markup.italic", fontStyle: "italic" },
+          { token: "markup.inline", foreground: "49a67d" },
+        ],
+        colors: {
+          "editor.background": "#0b1310",
+          "editor.foreground": "#e6efe8",
+          "editor.lineHighlightBackground": "#ffffff05",
+          "editor.selectionBackground": "#3e8b6a33",
+          "editor.inactiveSelectionBackground": "#3e8b6a15",
+          "editorCursor.foreground": "#3e8b6a",
+          "editorLineNumber.foreground": "#2a3b31",
+          "editorLineNumber.activeForeground": "#9fb0a5",
+          "editorIndentGuide.background": "rgba(255, 255, 255, 0.04)",
+          "editorIndentGuide.activeBackground": "rgba(255, 255, 255, 0.08)",
+          "editor.selectionHighlightBackground": "#3e8b6a15",
+          "editorBracketMatch.background": "#3e8b6a20",
+          "editorBracketMatch.border": "#3e8b6a40",
+          "scrollbar.shadow": "#00000000",
+          "scrollbarSlider.background": "rgba(255, 255, 255, 0.04)",
+          "scrollbarSlider.hoverBackground": "rgba(255, 255, 255, 0.07)",
+          "scrollbarSlider.activeBackground": "rgba(255, 255, 255, 0.10)",
+          "editorError.foreground": "#e45656",
+          "editorWarning.foreground": "#d9a441",
+          "editorInfo.foreground": "#4c7db3",
+          "editorError.border": "#00000000",
+          "editorWarning.border": "#00000000",
+          "editorOverviewRuler.errorForeground": "#00000000",
+          "editorOverviewRuler.warningForeground": "#00000000",
+          "editorOverviewRuler.infoForeground": "#00000000",
+          "editorOverviewRuler.border": "#00000000",
+          "editorOverviewRuler.background": "#00000000",
+          "editorGutter.background": "#0b1310",
+          "editorGutter.addedBackground": "#49a67d40",
+          "editorGutter.modifiedBackground": "#3e8b6a40",
+          "editorGutter.deletedBackground": "#e4565640",
+          "minimap.background": "#0b1310",
+          "minimap.errorHighlight": "#e4565640",
+        },
+      });
+
+      // Light Theme (Nordic Cream/Brown)
+      monaco.editor.defineTheme("rundoc-light", {
+        base: "vs",
+        inherit: true,
+        rules: [
+          { token: "comment", foreground: "9a8d80", fontStyle: "italic" },
+          { token: "keyword", foreground: "8a5a2b" },
+          { token: "string", foreground: "2f805d" },
+          { token: "number", foreground: "c4912d" },
+          { token: "type", foreground: "8a5a2b" },
+          { token: "function", foreground: "8a5a2b" },
+          { token: "variable", foreground: "2b241d" },
+          { token: "constant", foreground: "c4912d" },
+          { token: "tag", foreground: "8a5a2b" },
+          { token: "attribute.name", foreground: "8a5a2b" },
+          { token: "attribute.value", foreground: "2f805d" },
+          { token: "markup.heading", foreground: "8a5a2b", fontStyle: "bold" },
+          { token: "markup.bold", fontStyle: "bold" },
+          { token: "markup.italic", fontStyle: "italic" },
+          { token: "markup.inline", foreground: "2f805d" },
+        ],
+        colors: {
+          "editor.background": "#fbf7f0",
+          "editor.foreground": "#2b241d",
+          "editor.lineHighlightBackground": "#00000005",
+          "editor.selectionBackground": "#8a5a2b25",
+          "editor.inactiveSelectionBackground": "#8a5a2b10",
+          "editorCursor.foreground": "#8a5a2b",
+          "editorLineNumber.foreground": "#e3d7c8",
+          "editorLineNumber.activeForeground": "#9a8d80",
+          "editorIndentGuide.background": "rgba(0, 0, 0, 0.04)",
+          "editorIndentGuide.activeBackground": "rgba(0, 0, 0, 0.08)",
+          "editor.selectionHighlightBackground": "#8a5a2b10",
+          "editorBracketMatch.background": "#8a5a2b20",
+          "editorBracketMatch.border": "#8a5a2b40",
+          "scrollbar.shadow": "#00000000",
+          "scrollbarSlider.background": "rgba(0, 0, 0, 0.04)",
+          "scrollbarSlider.hoverBackground": "rgba(0, 0, 0, 0.07)",
+          "scrollbarSlider.activeBackground": "rgba(0, 0, 0, 0.10)",
+          "editorError.foreground": "#c94444",
+          "editorWarning.foreground": "#c4912d",
+          "editorInfo.foreground": "#3d6ea6",
+          "editorError.border": "#00000000",
+          "editorWarning.border": "#00000000",
+          "editorOverviewRuler.errorForeground": "#00000000",
+          "editorOverviewRuler.warningForeground": "#00000000",
+          "editorOverviewRuler.infoForeground": "#00000000",
+          "editorOverviewRuler.border": "#00000000",
+          "editorOverviewRuler.background": "#00000000",
+          "editorGutter.background": "#fbf7f0",
+          "editorGutter.addedBackground": "#2f805d40",
+          "editorGutter.modifiedBackground": "#8a5a2b40",
+          "editorGutter.deletedBackground": "#c9444440",
+          "minimap.background": "#fbf7f0",
+          "minimap.errorHighlight": "#c9444440",
+        },
+      });
+
+      // Apply theme based on current prop
+      monaco.editor.setTheme(theme === "dark" ? "rundoc-dark" : "rundoc-light");
+    }
+  }, [monaco, theme]);
+
+  const handleMount: OnMount = useCallback((editor) => {
     editorRef.current = editor;
     setIsReady(true);
 
-    // Custom dark theme — softer, no harsh red error markers
-    monaco.editor.defineTheme("rundoc-dark", {
-      base: "vs-dark",
-      inherit: true,
-      rules: [
-        { token: "comment", foreground: "6b7280", fontStyle: "italic" },
-        { token: "keyword", foreground: "818cf8" },
-        { token: "string", foreground: "34d399" },
-        { token: "number", foreground: "f59e0b" },
-        { token: "type", foreground: "60a5fa" },
-        { token: "function", foreground: "c084fc" },
-        { token: "variable", foreground: "e8eaed" },
-        { token: "constant", foreground: "fb923c" },
-        { token: "tag", foreground: "818cf8" },
-        { token: "attribute.name", foreground: "818cf8" },
-        { token: "attribute.value", foreground: "34d399" },
-        // Markdown specific
-        { token: "markup.heading", foreground: "818cf8", fontStyle: "bold" },
-        { token: "markup.bold", fontStyle: "bold" },
-        { token: "markup.italic", fontStyle: "italic" },
-        { token: "markup.inline", foreground: "fb923c" },
-      ],
-      colors: {
-        "editor.background": "#0c0c16",
-        "editor.foreground": "#f0f0f5",
-        "editor.lineHighlightBackground": "#ffffff05",
-        "editor.selectionBackground": "#5e61e633",
-        "editor.inactiveSelectionBackground": "#5e61e615",
-        "editorCursor.foreground": "#818cf8",
-        "editorLineNumber.foreground": "#2a2a42",
-        "editorLineNumber.activeForeground": "#9d9db5",
-        "editorIndentGuide.background": "rgba(255, 255, 255, 0.04)",
-        "editorIndentGuide.activeBackground": "rgba(255, 255, 255, 0.08)",
-        "editor.selectionHighlightBackground": "#5e61e615",
-        "editorBracketMatch.background": "#5e61e620",
-        "editorBracketMatch.border": "#5e61e640",
-        "scrollbar.shadow": "#00000000",
-        "scrollbarSlider.background": "rgba(255, 255, 255, 0.04)",
-        "scrollbarSlider.hoverBackground": "rgba(255, 255, 255, 0.07)",
-        "scrollbarSlider.activeBackground": "rgba(255, 255, 255, 0.10)",
-        // ✅ Fix: Override error/warning marker colors — no red stripes
-        "editorError.foreground": "#fbbf24",
-        "editorWarning.foreground": "#fbbf24",
-        "editorInfo.foreground": "#60a5fa",
-        "editorError.border": "#00000000",
-        "editorWarning.border": "#00000000",
-        // ✅ Fix: Overview ruler colors — remove red strips
-        "editorOverviewRuler.errorForeground": "#00000000",
-        "editorOverviewRuler.warningForeground": "#00000000",
-        "editorOverviewRuler.infoForeground": "#00000000",
-        "editorOverviewRuler.border": "#00000000",
-        "editorOverviewRuler.background": "#00000000",
-        // ✅ Fix: Gutter/margin — no red decorations
-        "editorGutter.background": "#0c0c16",
-        "editorGutter.addedBackground": "#34d39940",
-        "editorGutter.modifiedBackground": "#60a5fa40",
-        "editorGutter.deletedBackground": "#fbbf2440",
-        // Minimap
-        "minimap.background": "#0c0c16",
-        "minimap.errorHighlight": "#fbbf2440",
-      },
-    });
-
-    monaco.editor.setTheme("rundoc-dark");
-
-    // Word wrap for markdown
     if (monacoLanguage === "markdown") {
       editor.updateOptions({ wordWrap: "on" });
     }
 
-    // Focus editor
     editor.focus();
   }, [monacoLanguage]);
 
@@ -142,11 +203,10 @@ export default function CodeEditor({
       {!isReady && (
         <div
           className="flex items-center justify-center h-full"
-          style={{ background: "var(--background-secondary)" }}
+          style={{ background: "var(--background)" }}
         >
           <div className="flex items-center gap-3">
-            <div className="spinner" />
-            <span style={{ color: "var(--foreground-muted)", fontSize: "13px" }}>
+            <span style={{ color: "var(--foreground-muted)", fontSize: "12px", fontWeight: 500 }}>
               Editör yükleniyor...
             </span>
           </div>
@@ -158,15 +218,15 @@ export default function CodeEditor({
         value={value}
         onChange={(val) => onChange(val || "")}
         onMount={handleMount}
-        theme="rundoc-dark"
+        theme={theme === "dark" ? "rundoc-dark" : "rundoc-light"}
         loading={null}
         options={{
           fontSize: 14,
-          lineHeight: 22,
-          fontFamily: "var(--font-geist-mono), 'Fira Code', monospace",
+          lineHeight: 24, // better readability
+          fontFamily: "var(--font-mono), 'Fira Code', monospace",
           fontLigatures: true,
           minimap: { enabled: false },
-          padding: { top: 16, bottom: 16 },
+          padding: { top: 24, bottom: 24 }, // increased padding
           scrollBeyondLastLine: false,
           smoothScrolling: true,
           cursorBlinking: "smooth",
@@ -183,15 +243,12 @@ export default function CodeEditor({
           lineNumbers: "on",
           folding: true,
           glyphMargin: false,
-          lineDecorationsWidth: 8,
+          lineDecorationsWidth: 16,
           lineNumbersMinChars: 3,
-          // ✅ Fix: Completely disable red overview ruler and error decorations
           overviewRulerLanes: 0,
           hideCursorInOverviewRuler: true,
           overviewRulerBorder: false,
-          renderValidationDecorations: "off" as any,
-          // Disable red squiggly underlines for markdown content
-          "semanticHighlighting.enabled": false as any,
+          renderValidationDecorations: "off",
         }}
       />
     </div>

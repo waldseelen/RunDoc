@@ -1,0 +1,983 @@
+<!DOCTYPE html>
+<html xmlns="http://www.w3.org/1999/xhtml">
+<head>
+  <meta charset="utf-8" />
+  <meta name="generator" content="pandoc" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes" />
+  <title>Formüller</title>
+  <style>
+    /* Default styles provided by pandoc.
+    ** See https://pandoc.org/MANUAL.html#variables-for-html for config info.
+    */
+    html {
+      color: #1a1a1a;
+      background-color: #fdfdfd;
+    }
+    body {
+      margin: 0 auto;
+      max-width: 36em;
+      padding-left: 50px;
+      padding-right: 50px;
+      padding-top: 50px;
+      padding-bottom: 50px;
+      hyphens: auto;
+      overflow-wrap: break-word;
+      text-rendering: optimizeLegibility;
+      font-kerning: normal;
+    }
+    @media (max-width: 600px) {
+      body {
+        font-size: 0.9em;
+        padding: 12px;
+      }
+      h1 {
+        font-size: 1.8em;
+      }
+    }
+    @media print {
+      html {
+        background-color: white;
+      }
+      body {
+        background-color: transparent;
+        color: black;
+        font-size: 12pt;
+      }
+      p, h2, h3 {
+        orphans: 3;
+        widows: 3;
+      }
+      h2, h3, h4 {
+        page-break-after: avoid;
+      }
+    }
+    p {
+      margin: 1em 0;
+    }
+    a {
+      color: #1a1a1a;
+    }
+    a:visited {
+      color: #1a1a1a;
+    }
+    img {
+      max-width: 100%;
+    }
+    svg {
+      height: auto;
+      max-width: 100%;
+    }
+    h1, h2, h3, h4, h5, h6 {
+      margin-top: 1.4em;
+    }
+    h5, h6 {
+      font-size: 1em;
+      font-style: italic;
+    }
+    h6 {
+      font-weight: normal;
+    }
+    ol, ul {
+      padding-left: 1.7em;
+      margin-top: 1em;
+    }
+    li > ol, li > ul {
+      margin-top: 0;
+    }
+    blockquote {
+      margin: 1em 0 1em 1.7em;
+      padding-left: 1em;
+      border-left: 2px solid #e6e6e6;
+      color: #606060;
+    }
+    code {
+      white-space: pre-wrap;
+      font-family: Menlo, Monaco, Consolas, 'Lucida Console', monospace;
+      font-size: 85%;
+      margin: 0;
+      hyphens: manual;
+    }
+    pre {
+      margin: 1em 0;
+      overflow: auto;
+    }
+    pre code {
+      padding: 0;
+      overflow: visible;
+      overflow-wrap: normal;
+    }
+    .sourceCode {
+     background-color: transparent;
+     overflow: visible;
+    }
+    hr {
+      border: none;
+      border-top: 1px solid #1a1a1a;
+      height: 1px;
+      margin: 1em 0;
+    }
+    table {
+      margin: 1em 0;
+      border-collapse: collapse;
+      width: 100%;
+      overflow-x: auto;
+      display: block;
+      font-variant-numeric: lining-nums tabular-nums;
+    }
+    table caption {
+      margin-bottom: 0.75em;
+    }
+    tbody {
+      margin-top: 0.5em;
+      border-top: 1px solid #1a1a1a;
+      border-bottom: 1px solid #1a1a1a;
+    }
+    th {
+      border-top: 1px solid #1a1a1a;
+      padding: 0.25em 0.5em 0.25em 0.5em;
+    }
+    td {
+      padding: 0.125em 0.5em 0.25em 0.5em;
+    }
+    header {
+      margin-bottom: 4em;
+      text-align: center;
+    }
+    #TOC li {
+      list-style: none;
+    }
+    #TOC ul {
+      padding-left: 1.3em;
+    }
+    #TOC > ul {
+      padding-left: 0;
+    }
+    #TOC a:not(:hover) {
+      text-decoration: none;
+    }
+    span.smallcaps{font-variant: small-caps;}
+    div.columns{display: flex; gap: min(4vw, 1.5em);}
+    div.column{flex: auto; overflow-x: auto;}
+    div.hanging-indent{margin-left: 1.5em; text-indent: -1.5em;}
+    /* The extra [class] is a hack that increases specificity enough to
+       override a similar rule in reveal.js */
+    ul.task-list[class]{list-style: none;}
+    ul.task-list li input[type="checkbox"] {
+      font-size: inherit;
+      width: 0.8em;
+      margin: 0 0.8em 0.2em -1.6em;
+      vertical-align: middle;
+    }
+  </style>
+  <script defer=""
+  src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-chtml-full.js"
+  type="text/javascript"></script>
+</head>
+<body>
+<nav id="TOC" role="doc-toc">
+<ul>
+<li><a
+href="#eee-210-yarıiletken-fiziği-ve-mikroelektronik-elemanlar-tam-formül-kılavuzu"
+id="toc-eee-210-yarıiletken-fiziği-ve-mikroelektronik-elemanlar-tam-formül-kılavuzu">📐
+EEE-210 – Yarıiletken Fiziği ve Mikroelektronik Elemanlar Tam Formül
+Kılavuzu</a></li>
+<li><a href="#ch1-semiconductor-fundamentals-yarıiletken-temelleri"
+id="toc-ch1-semiconductor-fundamentals-yarıiletken-temelleri">🔵 CH1 –
+Semiconductor Fundamentals (Yarıiletken Temelleri)</a>
+<ul>
+<li><a href="#fermi-dirac-dağılımı-ve-boltzmann-yaklaşımı"
+id="toc-fermi-dirac-dağılımı-ve-boltzmann-yaklaşımı">1. Fermi-Dirac
+Dağılımı ve Boltzmann Yaklaşımı</a></li>
+<li><a href="#durum-yoğunluğu-efektif-durum-yoğunluğu"
+id="toc-durum-yoğunluğu-efektif-durum-yoğunluğu">2. Durum Yoğunluğu
+&amp; Efektif Durum Yoğunluğu</a></li>
+<li><a href="#taşıyıcı-konsantrasyonu"
+id="toc-taşıyıcı-konsantrasyonu">3. Taşıyıcı Konsantrasyonu</a></li>
+<li><a
+href="#kütle-etki-yasası-mass-action-law-ve-intrinsik-konsantrasyon"
+id="toc-kütle-etki-yasası-mass-action-law-ve-intrinsik-konsantrasyon">4.
+Kütle-Etki Yasası (Mass-Action Law) ve İntrinsik Konsantrasyon</a></li>
+<li><a href="#ekstrinsik-yarıiletkenler-yüksek-katkılama-yaklaşımı"
+id="toc-ekstrinsik-yarıiletkenler-yüksek-katkılama-yaklaşımı">5.
+Ekstrinsik Yarıiletkenler (Yüksek Katkılama Yaklaşımı)</a></li>
+<li><a href="#kompanse-yarıiletkenler-için-tam-kuadratik-çözüm"
+id="toc-kompanse-yarıiletkenler-için-tam-kuadratik-çözüm">6. Kompanse
+Yarıiletkenler için TAM (Kuadratik) Çözüm</a></li>
+<li><a href="#uzaysal-yük-nötrlüğü" id="toc-uzaysal-yük-nötrlüğü">7.
+Uzaysal Yük Nötrlüğü</a></li>
+<li><a
+href="#fermi-seviyesi-ve-intrinsik-seviye-ilişkisi-fermi-seviyesi-konumu"
+id="toc-fermi-seviyesi-ve-intrinsik-seviye-ilişkisi-fermi-seviyesi-konumu">8.
+Fermi Seviyesi ve İntrinsik Seviye İlişkisi (Fermi Seviyesi
+Konumu)</a></li>
+<li><a href="#boltzmann-yaklaşımı-geçerlilik-sınırı"
+id="toc-boltzmann-yaklaşımı-geçerlilik-sınırı">9. Boltzmann Yaklaşımı
+Geçerlilik Sınırı</a></li>
+<li><a
+href="#boltzmann-sınırı-ve-akseptör-iyonizasyon-enerjisi-ch1-q10-çözümü"
+id="toc-boltzmann-sınırı-ve-akseptör-iyonizasyon-enerjisi-ch1-q10-çözümü">10.
+Boltzmann Sınırı ve Akseptör İyonizasyon Enerjisi (CH1 Q10
+Çözümü)</a></li>
+<li><a
+href="#yüksek-sıcaklıkta-taşıyıcı-katkı-oranı-sınırı-ve-sıcaklık-bağımlılığı-ch1-q8-çözümü"
+id="toc-yüksek-sıcaklıkta-taşıyıcı-katkı-oranı-sınırı-ve-sıcaklık-bağımlılığı-ch1-q8-çözümü">11.
+Yüksek Sıcaklıkta Taşıyıcı Katkı Oranı Sınırı ve Sıcaklık Bağımlılığı
+(CH1 Q8 Çözümü)</a></li>
+</ul></li>
+<li><a
+href="#ch2-carrier-transport-and-recombination-taşıyıcı-iletimi-ve-rekombinasyon"
+id="toc-ch2-carrier-transport-and-recombination-taşıyıcı-iletimi-ve-rekombinasyon">🟢
+CH2 – Carrier Transport and Recombination (Taşıyıcı İletimi ve
+Rekombinasyon)</a>
+<ul>
+<li><a href="#saçılma-ve-mobilite-ilişkisi"
+id="toc-saçılma-ve-mobilite-ilişkisi">12. Saçılma ve Mobilite
+İlişkisi</a></li>
+<li><a href="#drift-sürüklenim-akımı-iletkenlik-ve-özdirenç"
+id="toc-drift-sürüklenim-akımı-iletkenlik-ve-özdirenç">13. Drift
+(Sürüklenim) Akımı, İletkenlik ve Özdirenç</a></li>
+<li><a href="#sürüklenme-hızı-hesaplaması-ch2-q6-çözümü"
+id="toc-sürüklenme-hızı-hesaplaması-ch2-q6-çözümü">14. Sürüklenme Hızı
+Hesaplaması (CH2 Q6 Çözümü)</a></li>
+<li><a href="#hall-etkisi-ch2-q3-çözümü"
+id="toc-hall-etkisi-ch2-q3-çözümü">15. Hall Etkisi (CH2 Q3
+Çözümü)</a></li>
+<li><a href="#difüzyon-akımı" id="toc-difüzyon-akımı">16. Difüzyon
+Akımı</a></li>
+<li><a
+href="#einstein-bağıntısı-ve-difüzyon-katsayısı-ch2-q5-ve-q12-çözümü"
+id="toc-einstein-bağıntısı-ve-difüzyon-katsayısı-ch2-q5-ve-q12-çözümü">17.
+Einstein Bağıntısı ve Difüzyon Katsayısı (CH2 Q5 ve Q12 Çözümü)</a></li>
+<li><a
+href="#sadeleştirilmiş-iletkenlik-formülleri-ch2-q8-ve-q9-sınav-kısayolları"
+id="toc-sadeleştirilmiş-iletkenlik-formülleri-ch2-q8-ve-q9-sınav-kısayolları">18.
+Sadeleştirilmiş İletkenlik Formülleri (CH2 Q8 ve Q9 Sınav
+Kısayolları)</a></li>
+<li><a
+href="#iletkenlik-değişimi-ile-fermi-seviyesi-kayması-ch2-q9-çözümü"
+id="toc-iletkenlik-değişimi-ile-fermi-seviyesi-kayması-ch2-q9-çözümü">19.
+İletkenlik Değişimi ile Fermi Seviyesi Kayması (CH2 Q9 Çözümü)</a></li>
+<li><a href="#quasi-fermi-seviyeleri-ch2-q10-çözümü"
+id="toc-quasi-fermi-seviyeleri-ch2-q10-çözümü">20. Quasi-Fermi
+Seviyeleri (CH2 Q10 Çözümü)</a></li>
+<li><a href="#işık-soğurulması-ve-minimum-kalınlık-ch2-q11-çözümü"
+id="toc-işık-soğurulması-ve-minimum-kalınlık-ch2-q11-çözümü">21. Işık
+Soğurulması ve Minimum Kalınlık (CH2 Q11 Çözümü)</a></li>
+<li><a
+href="#azınlık-taşıyıcı-difüzyon-uzunluğu-ch2-q12-ve-ch4-çözümleri"
+id="toc-azınlık-taşıyıcı-difüzyon-uzunluğu-ch2-q12-ve-ch4-çözümleri">22.
+Azınlık Taşıyıcı Difüzyon Uzunluğu (CH2 Q12 ve CH4 Çözümleri)</a></li>
+<li><a
+href="#azınlık-taşıyıcı-difüzyon-denklemi-ve-genel-çözümü-ch2-q13-çözümü"
+id="toc-azınlık-taşıyıcı-difüzyon-denklemi-ve-genel-çözümü-ch2-q13-çözümü">23.
+Azınlık Taşıyıcı Difüzyon Denklemi ve Genel Çözümü (CH2 Q13
+Çözümü)</a></li>
+</ul></li>
+<li><a href="#ch3-pn-junction-electrostatics-pn-eklemi-elektrostatniği"
+id="toc-ch3-pn-junction-electrostatics-pn-eklemi-elektrostatniği">🟠 CH3
+– pn Junction Electrostatics (pn Eklemi Elektrostatniği)</a>
+<ul>
+<li><a href="#kontak-potansiyeli-built-in-voltage"
+id="toc-kontak-potansiyeli-built-in-voltage">24. Kontak Potansiyeli
+(Built-in Voltage)</a></li>
+<li><a
+href="#depresyon-depletion-bölgesi-toplam-genişliği-ch3-tüm-sorular"
+id="toc-depresyon-depletion-bölgesi-toplam-genişliği-ch3-tüm-sorular">25.
+Depresyon (Depletion) Bölgesi Toplam Genişliği (CH3 Tüm
+Sorular)</a></li>
+<li><a href="#nötr-bölgelere-nüfuz-derinlikleri"
+id="toc-nötr-bölgelere-nüfuz-derinlikleri">26. Nötr Bölgelere Nüfuz
+Derinlikleri</a></li>
+<li><a href="#maksimum-elektrik-alan-ch3-q2-q3-çözümü"
+id="toc-maksimum-elektrik-alan-ch3-q2-q3-çözümü">27. Maksimum Elektrik
+Alan (CH3 Q2-Q3 Çözümü)</a></li>
+<li><a href="#depresyon-bölgesi-birim-yükü"
+id="toc-depresyon-bölgesi-birim-yükü">28. Depresyon Bölgesi Birim
+Yükü</a></li>
+<li><a href="#eklem-junction-kapasitesi-ch3-q4-çözümü"
+id="toc-eklem-junction-kapasitesi-ch3-q4-çözümü">29. Eklem (Junction)
+Kapasitesi (CH3 Q4 Çözümü)</a></li>
+<li><a href="#tek-taraflı-abrupt-eklemler-one-sided-junctions"
+id="toc-tek-taraflı-abrupt-eklemler-one-sided-junctions">30. Tek Taraflı
+Abrupt Eklemler (One-Sided Junctions)</a></li>
+<li><a
+href="#x_n-approx-x_d-qquad-x_p-approx-0x_d-approx-sqrtfrac2epsilon_sv_bi---v_aq-n_d-qquad-c_j-approx-sqrtfracq-epsilon_s-n_d2v_bi---v_a"
+id="toc-x_n-approx-x_d-qquad-x_p-approx-0x_d-approx-sqrtfrac2epsilon_sv_bi---v_aq-n_d-qquad-c_j-approx-sqrtfracq-epsilon_s-n_d2v_bi---v_a"><span
+class="math display">\[x_n \approx X_d \qquad x_p \approx
+0\]</span><span class="math display">\[X_d \approx
+\sqrt{\frac{2\epsilon_s(V_{bi} - V_A)}{q N_d}} \qquad C_j&#39; \approx
+\sqrt{\frac{q \epsilon_s N_d}{2(V_{bi} - V_A)}}\]</span></a></li>
+</ul></li>
+<li><a
+href="#ch4-pn-junction-under-forwardreverse-bias-bias-altında-pn-eklemi"
+id="toc-ch4-pn-junction-under-forwardreverse-bias-bias-altında-pn-eklemi">🔴
+CH4 – pn Junction Under Forward/Reverse Bias (Bias Altında pn
+Eklemi)</a>
+<ul>
+<li><a href="#ideal-diyot-shockley-akım-denklemi"
+id="toc-ideal-diyot-shockley-akım-denklemi">31. İdeal Diyot (Shockley)
+Akım Denklemi</a></li>
+<li><a href="#ters-doyum-akımı-ch4-q1-çözümü"
+id="toc-ters-doyum-akımı-ch4-q1-çözümü">32. Ters Doyum Akımı (CH4 Q1
+Çözümü)</a></li>
+<li><a href="#enjeksiyon-verimi-ch4-q3-çözümü"
+id="toc-enjeksiyon-verimi-ch4-q3-çözümü">33. Enjeksiyon Verimi (CH4 Q3
+Çözümü)</a></li>
+<li><a href="#nötr-bölgede-biriken-azınlık-taşıyıcı-yükü-ch4-q7-çözümü"
+id="toc-nötr-bölgede-biriken-azınlık-taşıyıcı-yükü-ch4-q7-çözümü">34.
+Nötr Bölgede Biriken Azınlık Taşıyıcı Yükü (CH4 Q7 Çözümü)</a></li>
+<li><a
+href="#diferansiyel-admitans-ve-difüzyon-kapasitesi-ch4-q8-çözümü"
+id="toc-diferansiyel-admitans-ve-difüzyon-kapasitesi-ch4-q8-çözümü">35.
+Diferansiyel Admitans ve Difüzyon Kapasitesi (CH4 Q8 Çözümü)</a></li>
+<li><a href="#optik-dedektör-fotoakımı-ch4-q5-çözümü"
+id="toc-optik-dedektör-fotoakımı-ch4-q5-çözümü">36. Optik Dedektör
+Fotoakımı (CH4 Q5 Çözümü)</a></li>
+<li><a href="#ters-polarma-jenerasyon-üretim-akımı-ch4-q6-çözümü"
+id="toc-ters-polarma-jenerasyon-üretim-akımı-ch4-q6-çözümü">37. Ters
+Polarma Jenerasyon (Üretim) Akımı (CH4 Q6 Çözümü)</a></li>
+<li><a href="#led-foton-üretim-hızı-ve-optik-güç-ch4-q4-çözümü"
+id="toc-led-foton-üretim-hızı-ve-optik-güç-ch4-q4-çözümü">38. LED Foton
+Üretim Hızı ve Optik Güç (CH4 Q4 Çözümü)</a>
+<ul>
+<li><a href="#hayati-fiziksel-sabitler"
+id="toc-hayati-fiziksel-sabitler">⚙️ Hayati Fiziksel Sabitler</a></li>
+<li><a href="#birim-dönüşüm-referans-tablosu"
+id="toc-birim-dönüşüm-referans-tablosu">📐 Birim Dönüşüm Referans
+Tablosu</a></li>
+</ul></li>
+</ul></li>
+</ul>
+</nav>
+<h1
+id="eee-210-yarıiletken-fiziği-ve-mikroelektronik-elemanlar-tam-formül-kılavuzu">📐
+EEE-210 – Yarıiletken Fiziği ve Mikroelektronik Elemanlar Tam Formül
+Kılavuzu</h1>
+<h1 id="ch1-semiconductor-fundamentals-yarıiletken-temelleri">🔵 CH1 –
+Semiconductor Fundamentals (Yarıiletken Temelleri)</h1>
+<h2 id="fermi-dirac-dağılımı-ve-boltzmann-yaklaşımı">1. Fermi-Dirac
+Dağılımı ve Boltzmann Yaklaşımı</h2>
+<p>Elektronların belirli bir <span class="math inline">\(E\)</span>
+enerji seviyesinde bulunma olasılığı:</p>
+<p><span class="math display">\[f(E) = \frac{1}{1 + e^{(E -
+E_F)/kT}}\]</span></p>
+<p>Oda sıcaklığında (<span class="math inline">\(T = 300\text{
+K}\)</span>) termal enerji sabiti:</p>
+<p><span class="math display">\[kT \approx 0.0259\text{ eV} \quad
+(\text{Pratik sınavlarda } 0.026\text{ eV} \text{
+alınabilir.})\]</span></p>
+<blockquote>
+<p><strong>⚠️ Boltzmann Yaklaşımı Sınırı (</strong><span
+class="math inline">\(E - E_F \gg kT\)</span><strong>):</strong></p>
+<p>Enerji seviyesi Fermi seviyesinden çok yukarıda olduğunda olasılık
+fonksiyonu üstele yaklaşır:</p>
+<p><span class="math display">\[f(E) \approx e^{-(E -
+E_F)/kT}\]</span></p>
+</blockquote>
+<h2 id="durum-yoğunluğu-efektif-durum-yoğunluğu">2. Durum Yoğunluğu
+&amp; Efektif Durum Yoğunluğu</h2>
+<p>Yarıiletkende birim hacim ve birim enerji başına düşen kuantum
+durumlarının sayısı:</p>
+<p><span class="math display">\[N(E) = \frac{4\pi}{h^3}(2m_e^*)^{3/2}(E
+- E_c)^{1/2}\]</span></p>
+<p>İletim ve valans bantları için efektif durum yoğunlukları (<span
+class="math inline">\(N_c\)</span> ve <span
+class="math inline">\(N_v\)</span>):</p>
+<p><span class="math display">\[N_c = 2\left(\frac{2\pi m_e^*
+kT}{h^2}\right)^{3/2} \qquad N_v = 2\left(\frac{2\pi m_h^*
+kT}{h^2}\right)^{3/2}\]</span></p>
+<blockquote>
+<p><strong>💡 Sıcaklık Ölçeklendirmesi (</strong><span
+class="math inline">\(N_c, N_v \propto
+T^{3/2}\)</span><strong>):</strong></p>
+<p>Farklı bir <span class="math inline">\(T_2\)</span> sıcaklığındaki
+efektif durum yoğunluklarını bulmak için oranlama formülü:</p>
+<p><span class="math display">\[N_c(T_2) =
+N_c(T_1)\left(\frac{T_2}{T_1}\right)^{3/2} \qquad N_v(T_2) =
+N_v(T_1)\left(\frac{T_2}{T_1}\right)^{3/2}\]</span></p>
+</blockquote>
+<h2 id="taşıyıcı-konsantrasyonu">3. Taşıyıcı Konsantrasyonu</h2>
+<p>İletim bandındaki elektron (<span class="math inline">\(n\)</span>)
+ve valans bandındaki delik (<span class="math inline">\(p\)</span>)
+konsantrasyonları:</p>
+<p><span class="math display">\[n = N_c e^{-(E_c - E_F)/kT} \qquad p =
+N_v e^{-(E_F - E_v)/kT}\]</span></p>
+<p>İntrinsik (katkılanmamış) Fermi seviyesi (<span
+class="math inline">\(E_i\)</span>) referans alınarak:</p>
+<p><span class="math display">\[n = n_i e^{(E_F - E_i)/kT} \qquad p =
+n_i e^{(E_i - E_F)/kT}\]</span></p>
+<h2 id="kütle-etki-yasası-mass-action-law-ve-intrinsik-konsantrasyon">4.
+Kütle-Etki Yasası (Mass-Action Law) ve İntrinsik Konsantrasyon</h2>
+<p>Termal dengedeki yarıiletkenler için en temel eşitlik:</p>
+<p><span class="math display">\[n \cdot p = n_i^2\]</span></p>
+<p><em>(CH1 Q2, Q5, Q6 ve Q7 sorularının çözümünde doğrudan
+kullanılır.)</em></p>
+<p>İntrinsik taşıyıcı konsantrasyonu (<span
+class="math inline">\(n_i\)</span>):</p>
+<p><span class="math display">\[n_i^2 = N_c N_v e^{-E_g/kT} \implies n_i
+= \sqrt{N_c N_v} e^{-E_g/2kT}\]</span></p>
+<blockquote>
+<p><strong>📊</strong> <span class="math inline">\(300\text{ K}\)</span>
+<strong>Sıcaklıkta Malzeme Sabitleri:</strong></p>
+<ul>
+<li><p><strong>Silisyum (Si):</strong> <span class="math inline">\(n_i =
+1.5 \times 10^{10}\text{ cm}^{-3}\)</span> (veya soruda verilirse <span
+class="math inline">\(10^{10}\text{ cm}^{-3}\)</span>)</p></li>
+<li><p><strong>Germanyum (Ge):</strong> <span class="math inline">\(n_i
+= 2.4 \times 10^{13}\text{ cm}^{-3}\)</span></p></li>
+<li><p><strong>Galliyum Arsenür (GaAs):</strong> <span
+class="math inline">\(n_i = 1.8 \times 10^{6}\text{
+cm}^{-3}\)</span></p></li>
+</ul>
+</blockquote>
+<h2 id="ekstrinsik-yarıiletkenler-yüksek-katkılama-yaklaşımı">5.
+Ekstrinsik Yarıiletkenler (Yüksek Katkılama Yaklaşımı)</h2>
+<p>Katkılama düzeyi intrinsik konsantrasyondan çok büyükse (<span
+class="math inline">\(N_d, N_a \gg n_i\)</span>):</p>
+<ul>
+<li><p><strong>n-tipi tek yönlü katkılama için:</strong></p>
+<p><span class="math display">\[n \approx N_d \qquad p =
+\frac{n_i^2}{N_d}\]</span></p></li>
+<li><p><strong>p-tipi tek yönlü katkılama için:</strong></p>
+<p><span class="math display">\[p \approx N_a \qquad n =
+\frac{n_i^2}{N_a}\]</span></p></li>
+</ul>
+<h2 id="kompanse-yarıiletkenler-için-tam-kuadratik-çözüm">6. Kompanse
+Yarıiletkenler için TAM (Kuadratik) Çözüm</h2>
+<p>Katkılama düzeyi <span class="math inline">\(n_i\)</span>’ye çok
+yakınsa veya iki tip katkı aynı anda varsa yaklaşım formülleri çöker.
+Kesin çözüm için şu kuadratik formüller uygulanmalıdır:</p>
+<ul>
+<li><p><strong>n-tipi baskın ise (</strong><span
+class="math inline">\(N_d &gt; N_a\)</span><strong>):</strong></p>
+<p><span class="math display">\[n = \frac{N_d - N_a}{2} +
+\sqrt{\left(\frac{N_d - N_a}{2}\right)^2 + n_i^2} \qquad p =
+\frac{n_i^2}{n}\]</span></p></li>
+<li><p><strong>p-tipi baskın ise (</strong><span
+class="math inline">\(N_a &gt; N_d\)</span><strong>):</strong></p>
+<p><span class="math display">\[p = \frac{N_a - N_d}{2} +
+\sqrt{\left(\frac{N_a - N_d}{2}\right)^2 + n_i^2} \qquad n =
+\frac{n_i^2}{p}\]</span></p>
+<p><em>(CH1 Q7 sorusunun tam ve hatasız çözümü için bu eşitlikler
+zorunludur.)</em></p></li>
+</ul>
+<blockquote>
+<p>⚠️ <strong>Kritik Sınav Uyarısı (CH1 Q2-b Çözümü):</strong></p>
+<p>Sıcaklık <span class="math inline">\(470\text{ K}\)</span> değerine
+ulaştığında Silisyum için <span class="math inline">\(n_i\)</span>
+değeri yaklaşık <span class="math inline">\(6 \times 10^{13}\text{
+cm}^{-3}\)</span> seviyesine çıkar. Akseptör katkılama düzeyi olan <span
+class="math inline">\(N_a = 10^{14}\text{ cm}^{-3}\)</span> değeri ile
+<span class="math inline">\(n_i\)</span> birbirine çok yakın olduğundan,
+<strong>yaklaşım formülü geçersizdir</strong>. Bu şıkta kesinlikle
+yukarıdaki kuadratik p-tipi formül kullanılmalıdır.</p>
+</blockquote>
+<h2 id="uzaysal-yük-nötrlüğü">7. Uzaysal Yük Nötrlüğü</h2>
+<p>Katkılanmış yarıiletkenin elektriksel olarak nötr olma şartı:</p>
+<p><span class="math display">\[n + N_a^- = p + N_d^+\]</span></p>
+<p>Tam iyonizasyon varsayımıyla (<span class="math inline">\(N_a^- =
+N_a\)</span>, <span class="math inline">\(N_d^+ = N_d\)</span>):</p>
+<p><span class="math display">\[n + N_a = p + N_d\]</span></p>
+<p><em>(CH1 Q9 sorusunda verilen</em> <span
+class="math inline">\(n\)</span> <em>ve</em> <span
+class="math inline">\(N_a\)</span> <em>değerlerinden</em> <span
+class="math inline">\(N_d\)</span> <em>katkılama miktarını bulmak için
+bu eşitlik kullanılır.)</em></p>
+<h2
+id="fermi-seviyesi-ve-intrinsik-seviye-ilişkisi-fermi-seviyesi-konumu">8.
+Fermi Seviyesi ve İntrinsik Seviye İlişkisi (Fermi Seviyesi Konumu)</h2>
+<p>İntrinsik Fermi seviyesinin konumu (efektif kütle farkından dolayı
+tam orta noktadan küçük bir kayma gösterir):</p>
+<p><span class="math display">\[E_i = \frac{1}{2}(E_c + E_v) +
+\frac{3}{4}kT\ln\left(\frac{m_h^*}{m_e^*}\right)\]</span></p>
+<p>Taşıyıcı konsantrasyonuna bağlı olarak Fermi seviyesinin konumu:</p>
+<ul>
+<li><p><strong>n-tipi için:</strong></p>
+<p><span class="math display">\[E_c - E_F =
+kT\ln\left(\frac{N_c}{N_d}\right) \qquad E_F - E_i =
+kT\ln\left(\frac{n}{n_i}\right)\]</span></p></li>
+<li><p><strong>p-tipi için:</strong></p>
+<p><span class="math display">\[E_F - E_v =
+kT\ln\left(\frac{N_v}{N_a}\right) \qquad E_i - E_F =
+kT\ln\left(\frac{p}{n_i}\right)\]</span></p>
+<p><em>(CH1 Q3 ve Q9 sorularının çözümünde bu ilişkiler
+kullanılır.)</em></p></li>
+</ul>
+<h2 id="boltzmann-yaklaşımı-geçerlilik-sınırı">9. Boltzmann Yaklaşımı
+Geçerlilik Sınırı</h2>
+<p>Yarıiletkenin dejenere olmaması ve Boltzmann istatistiğinin
+uygulanabilmesi için Fermi seviyesi ile bant kenarları arasındaki fark
+en az <span class="math inline">\(3kT\)</span> olmalıdır:</p>
+<p><span class="math display">\[|E_F - E_{c,v}| &gt; 3kT \implies
+N_{a,d} &lt; N_{c,v} e^{-3} \approx 0.05 \cdot N_{c,v}\]</span></p>
+<h2
+id="boltzmann-sınırı-ve-akseptör-iyonizasyon-enerjisi-ch1-q10-çözümü">10.
+Boltzmann Sınırı ve Akseptör İyonizasyon Enerjisi (CH1 Q10 Çözümü)</h2>
+<p>Boron katkılı p-tipi silisyumda Boltzmann yaklaşımının geçerlilik
+sınırında (<span class="math inline">\(E_F - E_a = 3kT\)</span>):</p>
+<p><span class="math display">\[E_F - E_v = (E_a - E_v) -
+3kT\]</span></p>
+<p>Sınır durumundaki maksimum katkılama limitini (<span
+class="math inline">\(N_{a,\max}\)</span>) bulmak için spin dejenerasyon
+faktörü (<span class="math inline">\(g_a = 4\)</span>) hesaba
+katılırsa:</p>
+<p><span class="math display">\[N_{a,\max} = \frac{N_v}{g_a} e^{-(E_a -
+E_v)/kT} e^{-3}\]</span></p>
+<p>Si içinde boron için <span class="math inline">\(E_a - E_v =
+0.045\text{ eV}\)</span> ve <span class="math inline">\(T = 300\text{
+K}\)</span> (<span class="math inline">\(N_v = 1.04 \times 10^{19}\text{
+cm}^{-3}\)</span>) değerleriyle hesaplandığında:</p>
+<p><span class="math display">\[N_{a,\max} \approx 3.2 \times
+10^{17}\text{ cm}^{-3}\]</span></p>
+<h2
+id="yüksek-sıcaklıkta-taşıyıcı-katkı-oranı-sınırı-ve-sıcaklık-bağımlılığı-ch1-q8-çözümü">11.
+Yüksek Sıcaklıkta Taşıyıcı Katkı Oranı Sınırı ve Sıcaklık Bağımlılığı
+(CH1 Q8 Çözümü)</h2>
+<p>Yüksek sıcaklık işletiminde intrinsik taşıyıcıların toplam elektron
+konsantrasyonuna katkısının en fazla <span
+class="math inline">\(\%5\)</span> olması isteniyorsa (<span
+class="math inline">\(n_i(T) \leq 0.05 \cdot N_d\)</span>):</p>
+<p><span class="math display">\[N_{d,\min} = 20 \cdot
+n_i(T)\]</span></p>
+<p>Burada <span class="math inline">\(n_i(T)\)</span> değeri hedef
+sıcaklıkta (<span class="math inline">\(T = 550\text{ K}\)</span>)
+oranlama yoluyla hesaplanır:</p>
+<p><span class="math display">\[n_i(T) \approx n_i(300\text{ K}) \cdot
+\left(\frac{T}{300}\right)^{3/2} \cdot \exp\left[-\frac{E_g}{2k}
+\left(\frac{1}{T} - \frac{1}{300}\right)\right]\]</span></p>
+<p><em>(Burada</em> <span class="math inline">\(k = 8.617 \times
+10^{-5}\text{ eV/K}\)</span> <em>kullanılır.)</em></p>
+<hr />
+<h1
+id="ch2-carrier-transport-and-recombination-taşıyıcı-iletimi-ve-rekombinasyon">🟢
+CH2 – Carrier Transport and Recombination (Taşıyıcı İletimi ve
+Rekombinasyon)</h1>
+<h2 id="saçılma-ve-mobilite-ilişkisi">12. Saçılma ve Mobilite
+İlişkisi</h2>
+<p>Ortalama serbest zaman (<span
+class="math inline">\(\tau_m\)</span>):</p>
+<p><span class="math display">\[\tau_m = \frac{m^* \mu}{q}\]</span></p>
+<p>Ortalama serbest yol (<span class="math inline">\(l_m\)</span>):</p>
+<p><span class="math display">\[l_m = v_{th} \cdot \tau_m\]</span></p>
+<p>Yarıiletken içindeki termal hız (<span
+class="math inline">\(v_{th}\)</span>):</p>
+<p><span class="math display">\[\frac{1}{2} m^* v_{th}^2 = \frac{3}{2}
+kT \implies v_{th} = \sqrt{\frac{3kT}{m^*}} \approx 10^7\text{
+cm/s}\]</span></p>
+<blockquote>
+<p><strong>💡 Matthiessen Kuralı (Farklı Saçılma Mekanizmaları Bir
+Aradayken - CH2 Q7 Çözümü):</strong></p>
+<p>Örgü (fonon) saçılması (<span class="math inline">\(\mu_L\)</span>)
+ve iyonize safsızlık saçılması (<span
+class="math inline">\(\mu_I\)</span>) birlikte etkili olduğunda:</p>
+<p><span class="math display">\[\frac{1}{\mu_{\text{toplam}}} =
+\frac{1}{\mu_L} + \frac{1}{\mu_I} \implies \mu_I =
+\frac{\mu_{\text{toplam}} \cdot \mu_L}{\mu_L -
+\mu_{\text{toplam}}}\]</span></p>
+</blockquote>
+<h2 id="drift-sürüklenim-akımı-iletkenlik-ve-özdirenç">13. Drift
+(Sürüklenim) Akımı, İletkenlik ve Özdirenç</h2>
+<p>Elektrik alan altında taşıyıcıların sürüklenme hızı (<span
+class="math inline">\(v_d\)</span>):</p>
+<p><span class="math display">\[v_d = \mu \mathcal{E}\]</span></p>
+<p>Sürüklenim akım yoğunluğu (<span
+class="math inline">\(J_{drift}\)</span>):</p>
+<p><span class="math display">\[J_{drift} = q(n\mu_n +
+p\mu_p)\mathcal{E} = \sigma \mathcal{E}\]</span></p>
+<p>İletkenlik (<span class="math inline">\(\sigma\)</span>) ve özdirenç
+(<span class="math inline">\(\rho\)</span>):</p>
+<p><span class="math display">\[\sigma = q(n\mu_n + p\mu_p) \qquad \rho
+= \frac{1}{\sigma}\]</span></p>
+<p>Direnç (<span class="math inline">\(R\)</span>):</p>
+<p><span class="math display">\[R = \rho \frac{L}{A}\]</span></p>
+<h2 id="sürüklenme-hızı-hesaplaması-ch2-q6-çözümü">14. Sürüklenme Hızı
+Hesaplaması (CH2 Q6 Çözümü)</h2>
+<p>Belli bir akım (<span class="math inline">\(I\)</span>) ve kesit
+alanı (<span class="math inline">\(A\)</span>) altında taşıyıcıların net
+hızı:</p>
+<p><span class="math display">\[v_d = \frac{J}{q n} = \frac{I}{q \cdot n
+\cdot A}\]</span></p>
+<h2 id="hall-etkisi-ch2-q3-çözümü">15. Hall Etkisi (CH2 Q3 Çözümü)</h2>
+<p>Malzemenin tipini ve çoğunluk taşıyıcı konsantrasyonunu belirlemek
+için:</p>
+<p><span class="math display">\[R_H = -\frac{1}{q n} \quad (\text{n-tipi
+için}) \qquad R_H = \frac{1}{q p} \quad (\text{p-tipi
+için})\]</span></p>
+<p>Hall voltajı (<span class="math inline">\(V_H\)</span>):</p>
+<p><span class="math display">\[V_H = \frac{R_H I B_z}{W}\]</span></p>
+<p><em>(Burada</em> <span class="math inline">\(W\)</span> <em>numunenin
+kalınlığı,</em> <span class="math inline">\(B_z\)</span> <em>uygulanan
+manyetik alandır.)</em></p>
+<h2 id="difüzyon-akımı">16. Difüzyon Akımı</h2>
+<p>Konsantrasyon gradyanından dolayı oluşan akım yoğunluğu:</p>
+<p><span class="math display">\[J_n^{diff} = q D_n \frac{dn}{dx} \qquad
+J_p^{diff} = -q D_p \frac{dp}{dx}\]</span></p>
+<p>Doğrusal gradyanlar için (<span class="math inline">\(\Delta n /
+\Delta x\)</span> - CH2 Q4 Çözümü):</p>
+<p><span class="math display">\[J_n = q D_n \frac{\Delta n}{\Delta
+x}\]</span></p>
+<h2
+id="einstein-bağıntısı-ve-difüzyon-katsayısı-ch2-q5-ve-q12-çözümü">17.
+Einstein Bağıntısı ve Difüzyon Katsayısı (CH2 Q5 ve Q12 Çözümü)</h2>
+<p>Mobilite ve difüzyon katsayısı arasındaki termal denge ilişkisi:</p>
+<p><span class="math display">\[\frac{D_n}{\mu_n} = \frac{D_p}{\mu_p} =
+\frac{kT}{q} = V_t \approx 0.0259\text{ V}\]</span><span
+class="math display">\[D = \mu \frac{kT}{q} = \mu V_t\]</span></p>
+<h2
+id="sadeleştirilmiş-iletkenlik-formülleri-ch2-q8-ve-q9-sınav-kısayolları">18.
+Sadeleştirilmiş İletkenlik Formülleri (CH2 Q8 ve Q9 Sınav
+Kısayolları)</h2>
+<p>Katkılanmış yarıiletkenlerde azınlık taşıyıcıların iletkenliğe etkisi
+ihmal edilebilir düzeydedir:</p>
+<p><span class="math display">\[\sigma \approx q n \mu_n \quad
+(\text{n-tipi için})\]</span><span class="math display">\[\sigma \approx
+q p \mu_p \quad (\text{p-tipi için})\]</span></p>
+<h2
+id="iletkenlik-değişimi-ile-fermi-seviyesi-kayması-ch2-q9-çözümü">19.
+İletkenlik Değişimi ile Fermi Seviyesi Kayması (CH2 Q9 Çözümü)</h2>
+<p>Katkılama sonucunda özdirenç düşer, iletkenlik artar. İletkenlik
+artış katsayısı <span class="math inline">\(k\)</span> ise (<span
+class="math inline">\(\sigma_{doped} = k \cdot
+\sigma_{intrinsic}\)</span>):</p>
+<p><span class="math display">\[\sigma_{intrinsic} = q n_i (\mu_n +
+\mu_p)\]</span><span class="math display">\[\sigma_{doped} \approx q n
+\mu_n \quad (\text{n-tipi katkılama için})\]</span></p>
+<p>Buradan elde edilen yeni elektron konsantrasyonu <span
+class="math inline">\(n\)</span> kullanılarak Fermi seviyesi kayması
+bulunur:</p>
+<p><span class="math display">\[E_F - E_i = kT
+\ln\left(\frac{n}{n_i}\right)\]</span></p>
+<h2 id="quasi-fermi-seviyeleri-ch2-q10-çözümü">20. Quasi-Fermi
+Seviyeleri (CH2 Q10 Çözümü)</h2>
+<p>Denge dışı enjeksiyon durumunda (<span class="math inline">\(\Delta n
+= \Delta p\)</span>) elektron ve delikler için ayrı ayrı tanımlanan
+yalancı Fermi seviyeleri:</p>
+<p><span class="math display">\[n = n_i e^{(E_{Fn} - E_i)/kT} \qquad p =
+n_i e^{(E_i - E_{Fp})/kT}\]</span><span class="math display">\[E_{Fn} -
+E_{Fp} = kT \ln\left(\frac{n \cdot p}{n_i^2}\right)\]</span></p>
+<p>Katkısız (intrinsik) malzemede enjeksiyon yapıldığında:</p>
+<p><span class="math display">\[n = n_i + \Delta n \qquad p = n_i +
+\Delta p \implies E_{Fn} - E_{Fp} = 2kT\ln\left(\frac{n_i + \Delta
+n}{n_i}\right)\]</span></p>
+<h2 id="işık-soğurulması-ve-minimum-kalınlık-ch2-q11-çözümü">21. Işık
+Soğurulması ve Minimum Kalınlık (CH2 Q11 Çözümü)</h2>
+<p>Beer-Lambert Kanunu uyarınca ışık şiddetinin malzeme derinliğine göre
+azalması:</p>
+<p><span class="math display">\[I(x) = I_0 e^{-\alpha x}\]</span></p>
+<p>Gelen ışığın <span class="math inline">\(\%90\)</span>’ını absorbe
+etmek için gereken minimum kalınlık (<span
+class="math inline">\(d\)</span>):</p>
+<p><span class="math display">\[1 - e^{-\alpha d} = 0.90 \implies
+e^{-\alpha d} = 0.10 \implies d = \frac{\ln(10)}{\alpha} \approx
+\frac{2.3}{\alpha}\]</span></p>
+<h2 id="azınlık-taşıyıcı-difüzyon-uzunluğu-ch2-q12-ve-ch4-çözümleri">22.
+Azınlık Taşıyıcı Difüzyon Uzunluğu (CH2 Q12 ve CH4 Çözümleri)</h2>
+<p>Azınlık taşıyıcıların rekombine olmadan önce katettikleri ortalama
+mesafe:</p>
+<p><span class="math display">\[L = \sqrt{D \tau} \implies L_n =
+\sqrt{D_n \tau_n} \qquad L_p = \sqrt{D_p \tau_p}\]</span></p>
+<h2
+id="azınlık-taşıyıcı-difüzyon-denklemi-ve-genel-çözümü-ch2-q13-çözümü">23.
+Azınlık Taşıyıcı Difüzyon Denklemi ve Genel Çözümü (CH2 Q13 Çözümü)</h2>
+<p>Uzaysal olarak kararlı haldeki azınlık taşıyıcı dağılımı:</p>
+<p><span class="math display">\[\frac{d^2(\Delta n)}{dx^2} -
+\frac{\Delta n}{L_n^2} = 0\]</span></p>
+<p>Genel Çözüm Yapısı:</p>
+<p><span class="math display">\[\Delta n(x) = K_1 e^{-x/L_n} + K_2
+e^{x/L_n}\]</span></p>
+<p><em>Sınır koşulları (</em><span class="math inline">\(\Delta
+n(0)\)</span> <em>ve</em> <span class="math inline">\(\Delta
+n(L)\)</span><em>) uygulanarak</em> <span
+class="math inline">\(K_1\)</span> <em>ve</em> <span
+class="math inline">\(K_2\)</span> <em>katsayıları bulunur.</em></p>
+<ul>
+<li><span class="math inline">\(L \ll L_n\)</span> ise dağılım tamamen
+doğrusala yaklaşır.</li>
+</ul>
+<hr />
+<h1 id="ch3-pn-junction-electrostatics-pn-eklemi-elektrostatniği">🟠 CH3
+– pn Junction Electrostatics (pn Eklemi Elektrostatniği)</h1>
+<h2 id="kontak-potansiyeli-built-in-voltage">24. Kontak Potansiyeli
+(Built-in Voltage)</h2>
+<p>Sıfır dış bias altında p-n ekleminde kendiliğinden oluşan potansiyel
+bariyeri:</p>
+<p><span class="math display">\[V_{bi} \quad (\text{veya } \Psi_0) = V_t
+\ln\left(\frac{N_a N_d}{n_i^2}\right)\]</span></p>
+<p><em>(CH3 Q1’in çözümünde doğrudan kullanılır.)</em></p>
+<h2
+id="depresyon-depletion-bölgesi-toplam-genişliği-ch3-tüm-sorular">25.
+Depresyon (Depletion) Bölgesi Toplam Genişliği (CH3 Tüm Sorular)</h2>
+<p>Uygulanan dış gerilim (<span class="math inline">\(V_A\)</span>)
+altındaki toplam fakirleşme genişliği:</p>
+<p><span class="math display">\[X_d = \sqrt{\frac{2 \epsilon_s}{q}
+\left( \frac{N_a + N_d}{N_a N_d} \right) (V_{bi} - V_A)}\]</span></p>
+<ul>
+<li><p><strong>Sıfır Polarma (Zero Bias):</strong> <span
+class="math inline">\(V_A = 0\)</span></p></li>
+<li><p><strong>İleri Polarma (Forward Bias):</strong> <span
+class="math inline">\(V_A &gt; 0\)</span></p></li>
+<li><p><strong>Ters Polarma (Reverse Bias):</strong> <span
+class="math inline">\(V_A = -V_R \implies\)</span> Terim <span
+class="math inline">\((V_{bi} + V_R)\)</span> haline gelir.</p></li>
+</ul>
+<h2 id="nötr-bölgelere-nüfuz-derinlikleri">26. Nötr Bölgelere Nüfuz
+Derinlikleri</h2>
+<p>Toplam fakirleşme genişliğinin p ve n bölgelerindeki dağılımı:</p>
+<p><span class="math display">\[N_a x_p = N_d x_n \implies X_d = x_n +
+x_p\]</span><span class="math display">\[x_n = X_d \left( \frac{N_a}{N_a
++ N_d} \right) \qquad x_p = X_d \left( \frac{N_d}{N_a + N_d}
+\right)\]</span></p>
+<h2 id="maksimum-elektrik-alan-ch3-q2-q3-çözümü">27. Maksimum Elektrik
+Alan (CH3 Q2-Q3 Çözümü)</h2>
+<p>Eklemin tam birleşme noktasında (<span class="math inline">\(x =
+0\)</span>) oluşan en yüksek elektrik alan gücü:</p>
+<p><span class="math display">\[|E_{\max}| = \frac{q N_d
+x_n}{\epsilon_s} = \frac{q N_a x_p}{\epsilon_s} = \frac{2(V_{bi} -
+V_A)}{X_d}\]</span></p>
+<h2 id="depresyon-bölgesi-birim-yükü">28. Depresyon Bölgesi Birim
+Yükü</h2>
+<p>Eklem alanının p veya n tarafındaki net iyon yükü (büyüklük
+olarak):</p>
+<p><span class="math display">\[Q = q \cdot A \cdot N_d \cdot x_n = q
+\cdot A \cdot N_a \cdot x_p\]</span></p>
+<h2 id="eklem-junction-kapasitesi-ch3-q4-çözümü">29. Eklem (Junction)
+Kapasitesi (CH3 Q4 Çözümü)</h2>
+<p>Birim alan başına eklem kapasitesi (<span
+class="math inline">\(C_j&#39;\)</span>):</p>
+<p><span class="math display">\[C_j&#39; = \frac{\epsilon_s}{X_d} =
+\sqrt{\frac{q \epsilon_s N_a N_d}{2(N_a + N_d)(V_{bi} -
+V_A)}}\]</span></p>
+<p>Toplam Kapasite:</p>
+<p><span class="math display">\[C_j = A \cdot C_j&#39; = A
+\frac{\epsilon_s}{X_d}\]</span></p>
+<h2 id="tek-taraflı-abrupt-eklemler-one-sided-junctions">30. Tek Taraflı
+Abrupt Eklemler (One-Sided Junctions)</h2>
+<p>Katkılama oranlarının bir tarafta aşırı yüksek olması durumunda
+(<span class="math inline">\(p^+-n\)</span> eklemi için <span
+class="math inline">\(N_a \gg N_d\)</span>):</p>
+<h2
+id="x_n-approx-x_d-qquad-x_p-approx-0x_d-approx-sqrtfrac2epsilon_sv_bi---v_aq-n_d-qquad-c_j-approx-sqrtfracq-epsilon_s-n_d2v_bi---v_a"><span
+class="math display">\[x_n \approx X_d \qquad x_p \approx
+0\]</span><span class="math display">\[X_d \approx
+\sqrt{\frac{2\epsilon_s(V_{bi} - V_A)}{q N_d}} \qquad C_j&#39; \approx
+\sqrt{\frac{q \epsilon_s N_d}{2(V_{bi} - V_A)}}\]</span></h2>
+<hr />
+<h1
+id="ch4-pn-junction-under-forwardreverse-bias-bias-altında-pn-eklemi">🔴
+CH4 – pn Junction Under Forward/Reverse Bias (Bias Altında pn
+Eklemi)</h1>
+<h2 id="ideal-diyot-shockley-akım-denklemi">31. İdeal Diyot (Shockley)
+Akım Denklemi</h2>
+<p>Diyottan geçen toplam akım ve akım yoğunluğu ilişkisi:</p>
+<p><span class="math display">\[I = I_s \left( e^{V_A/V_t} - 1 \right)
+\qquad J = J_s \left( e^{V_A/V_t} - 1 \right)\]</span><span
+class="math display">\[I = J \cdot A\]</span></p>
+<h2 id="ters-doyum-akımı-ch4-q1-çözümü">32. Ters Doyum Akımı (CH4 Q1
+Çözümü)</h2>
+<p>Azınlık taşıyıcı difüzyonu nedeniyle oluşan taban sızıntı akımı:</p>
+<p><span class="math display">\[I_s = A \cdot J_s = A \cdot q n_i^2
+\left( \frac{D_p}{L_p N_d} + \frac{D_n}{L_n N_a} \right)\]</span></p>
+<h2 id="enjeksiyon-verimi-ch4-q3-çözümü">33. Enjeksiyon Verimi (CH4 Q3
+Çözümü)</h2>
+<p>İleri yönde polarılmış eklemde, elektron enjeksiyon akımının toplam
+akıma oranı:</p>
+<p><span class="math display">\[\gamma_{inj} =
+\frac{J_n}{J_{\text{toplam}}} = \frac{J_n}{J_n + J_p} =
+\frac{\frac{D_n}{L_n N_a}}{\frac{D_n}{L_n N_a} + \frac{D_p}{L_p
+N_d}}\]</span></p>
+<h2 id="nötr-bölgede-biriken-azınlık-taşıyıcı-yükü-ch4-q7-çözümü">34.
+Nötr Bölgede Biriken Azınlık Taşıyıcı Yükü (CH4 Q7 Çözümü)</h2>
+<p>İleri bias altında nötr n-bölgesinde biriken fazla deliklerin birim
+alan başına toplam yükü:</p>
+<p><span class="math display">\[Q_p = q \cdot p_{n0} \cdot L_p \left(
+e^{V_A/V_t} - 1 \right) = J_p \cdot \tau_p\]</span></p>
+<h2 id="diferansiyel-admitans-ve-difüzyon-kapasitesi-ch4-q8-çözümü">35.
+Diferansiyel Admitans ve Difüzyon Kapasitesi (CH4 Q8 Çözümü)</h2>
+<p>Diyodun küçük işaret admitansı (<span
+class="math inline">\(Y\)</span>):</p>
+<p><span class="math display">\[Y = g_d + j\omega (C_j +
+C_{diff})\]</span></p>
+<ul>
+<li><p>Diyot İletkenliği: <span class="math inline">\(g_d =
+\frac{I}{V_t}\)</span></p></li>
+<li><p>Difüzyon Kapasitesi: <span class="math inline">\(C_{diff} = K_f
+\left( \frac{q}{kT} \right) I \tau_p = K_f \frac{I
+\tau_p}{V_t}\)</span></p></li>
+</ul>
+<blockquote>
+<p><strong>Tasarım Faktörü (</strong><span
+class="math inline">\(K_f\)</span><strong>):</strong></p>
+<ul>
+<li><p>Uzun tabanlı diyotlar (Long Base) için: <span
+class="math inline">\(K_f = 1/2\)</span></p></li>
+<li><p>Dar tabanlı diyotlar (Narrow Base) için: <span
+class="math inline">\(K_f = 2/3\)</span></p></li>
+</ul>
+</blockquote>
+<h2 id="optik-dedektör-fotoakımı-ch4-q5-çözümü">36. Optik Dedektör
+Fotoakımı (CH4 Q5 Çözümü)</h2>
+<p>Depresyon bölgesinde ve bu bölgeye difüzyon mesafesinde üretilen tüm
+taşıyıcıların toplandığı toplam fotoakım (<span
+class="math inline">\(I_L\)</span>):</p>
+<p><span class="math display">\[I_L = q \cdot A \cdot G_L \cdot (X_d +
+L_n + L_p)\]</span></p>
+<h2 id="ters-polarma-jenerasyon-üretim-akımı-ch4-q6-çözümü">37. Ters
+Polarma Jenerasyon (Üretim) Akımı (CH4 Q6 Çözümü)</h2>
+<p>Ters bias altında depresyon bölgesindeki termal jenerasyon nedeniyle
+oluşan akım yoğunluğu:</p>
+<p><span class="math display">\[J_{gen} = \frac{q n_i
+X_d}{\tau_g}\]</span></p>
+<p><em>(Soru</em> <span class="math inline">\(\tau_g = \tau_n =
+\tau_p\)</span> <em>olarak verirse paydadaki katsayı</em> <span
+class="math inline">\(1\)</span> <em>alınır.)</em></p>
+<h2 id="led-foton-üretim-hızı-ve-optik-güç-ch4-q4-çözümü">38. LED Foton
+Üretim Hızı ve Optik Güç (CH4 Q4 Çözümü)</h2>
+<p>Enjekte edilen azınlık taşıyıcılarının foton üretme kapasitesi:</p>
+<ul>
+<li><p>Elektron enjeksiyon akımı: <span class="math inline">\(I_n =
+\gamma_{inj} \cdot I_{\text{toplam}}\)</span></p></li>
+<li><p>Foton Üretim Hızı (<span
+class="math inline">\(R_{\text{photon}}\)</span>):</p>
+<p><span class="math display">\[R_{\text{photon}} = \frac{I_n}{q} \quad
+(\text{s}^{-1})\]</span></p></li>
+<li><p>LED Optik Gücü (<span
+class="math inline">\(P_{\text{opt}}\)</span>):</p>
+<p><span class="math display">\[P_{\text{opt}} = R_{\text{photon}} \cdot
+E_g \cdot (1.6 \times 10^{-19}\text{ J/eV}) \quad
+(\text{Watt})\]</span></p></li>
+</ul>
+<h3 id="hayati-fiziksel-sabitler">⚙️ Hayati Fiziksel Sabitler</h3>
+<table>
+<colgroup>
+<col style="width: 38%" />
+<col style="width: 30%" />
+<col style="width: 30%" />
+</colgroup>
+<thead>
+<tr>
+<th style="text-align: center;">Sembol</th>
+<th style="text-align: left;">Tanım</th>
+<th style="text-align: left;">Değer</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="text-align: center;"><span
+class="math inline">\(q\)</span></td>
+<td style="text-align: left;">Elektron Yükü</td>
+<td style="text-align: left;"><span class="math inline">\(1.6 \times
+10^{-19}\text{ C}\)</span></td>
+</tr>
+<tr>
+<td style="text-align: center;"><span
+class="math inline">\(k\)</span></td>
+<td style="text-align: left;">Boltzmann Sabiti</td>
+<td style="text-align: left;"><span class="math inline">\(1.38 \times
+10^{-23}\text{ J/K}\)</span> veya <span class="math inline">\(8.617
+\times 10^{-5}\text{ eV/K}\)</span></td>
+</tr>
+<tr>
+<td style="text-align: center;"><span
+class="math inline">\(\epsilon_0\)</span></td>
+<td style="text-align: left;">Boşluğun Permittivitesi</td>
+<td style="text-align: left;"><span class="math inline">\(8.854 \times
+10^{-14}\text{ F/cm}\)</span></td>
+</tr>
+<tr>
+<td style="text-align: center;"><span class="math inline">\(\epsilon_s
+\text{ (Si)}\)</span></td>
+<td style="text-align: left;">Silisyumun Dielektrik Sabiti</td>
+<td style="text-align: left;"><span class="math inline">\(11.7 \cdot
+\epsilon_0 \approx 1.036 \times 10^{-12}\text{ F/cm}\)</span></td>
+</tr>
+<tr>
+<td style="text-align: center;"><span class="math inline">\(\epsilon_s
+\text{ (GaAs)}\)</span></td>
+<td style="text-align: left;">GaAs Dielektrik Sabiti</td>
+<td style="text-align: left;"><span class="math inline">\(13.1 \cdot
+\epsilon_0 \approx 1.16 \times 10^{-12}\text{ F/cm}\)</span></td>
+</tr>
+<tr>
+<td style="text-align: center;"><span
+class="math inline">\(V_t\)</span></td>
+<td style="text-align: left;">Termal Voltaj (<span
+class="math inline">\(300\text{ K}\)</span>)</td>
+<td style="text-align: left;"><span class="math inline">\(0.0259\text{
+V}\)</span> (Pratik hesaplar için <span
+class="math inline">\(0.026\text{ V}\)</span>)</td>
+</tr>
+</tbody>
+</table>
+<hr />
+<h3 id="birim-dönüşüm-referans-tablosu">📐 Birim Dönüşüm Referans
+Tablosu</h3>
+<blockquote>
+<p><strong>Sınav İpucu:</strong> Sınav esnasında birim hatası yapmamak
+için soruda verilen her uzunluğu, alanı ve hacmi işlem yapmadan önce
+hemen santimetre (<span class="math inline">\(\text{cm}\)</span>)
+tabanına çevir:</p>
+</blockquote>
+<table>
+<colgroup>
+<col style="width: 44%" />
+<col style="width: 55%" />
+</colgroup>
+<thead>
+<tr>
+<th style="text-align: left;">Birim Türü</th>
+<th style="text-align: left;">Dönüşüm Eşitliği</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="text-align: left;">Metre (<span
+class="math inline">\(\text{m}\)</span>)</td>
+<td style="text-align: left;"><span class="math inline">\(1\text{ m} =
+100\text{ cm}\)</span></td>
+</tr>
+<tr>
+<td style="text-align: left;">Milimetre (<span
+class="math inline">\(\text{mm}\)</span>)</td>
+<td style="text-align: left;"><span class="math inline">\(1\text{ mm} =
+0.1\text{ cm}\)</span></td>
+</tr>
+<tr>
+<td style="text-align: left;">Mikrometre (<span
+class="math inline">\(\mu\text{m}\)</span>)</td>
+<td style="text-align: left;"><span class="math inline">\(1\ \mu\text{m}
+= 10^{-4}\text{ cm}\)</span></td>
+</tr>
+<tr>
+<td style="text-align: left;">Nanometre (<span
+class="math inline">\(\text{nm}\)</span>)</td>
+<td style="text-align: left;"><span class="math inline">\(1\text{ nm} =
+10^{-7}\text{ cm}\)</span></td>
+</tr>
+<tr>
+<td style="text-align: left;">Angstrom (<span
+class="math inline">\(\text{Å}\)</span>)</td>
+<td style="text-align: left;"><span class="math inline">\(1 \times
+10^{-8} \text{ cm}\)</span></td>
+</tr>
+<tr>
+<td style="text-align: left;">Pikometre (<span
+class="math inline">\(\text{pm}\)</span>)</td>
+<td style="text-align: left;"><span class="math inline">\(1\text{ pm} =
+10^{-10}\text{ cm}\)</span></td>
+</tr>
+<tr>
+<td style="text-align: left;">Milimetrekare (<span
+class="math inline">\(\text{mm}^2\)</span>)</td>
+<td style="text-align: left;"><span class="math inline">\(1\text{ mm}^2
+= 10^{-2}\text{ cm}^2\)</span></td>
+</tr>
+<tr>
+<td style="text-align: left;">Mikrometrekare (<span
+class="math inline">\(\mu\text{m}^2\)</span>)</td>
+<td style="text-align: left;"><span class="math inline">\(1\
+\mu\text{m}^2 = 10^{-8}\text{ cm}^2\)</span></td>
+</tr>
+</tbody>
+</table>
+</body>
+</html>
