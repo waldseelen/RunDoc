@@ -50,12 +50,6 @@ class Settings:
     )
 
     # Security
-    worker_require_auth: bool = field(
-        default_factory=lambda: _get_bool_env("WORKER_REQUIRE_AUTH", False)
-    )
-    worker_api_token: str = field(
-        default_factory=lambda: os.getenv("WORKER_API_TOKEN", "")
-    )
     allowed_origins: List[str] = field(
         default_factory=lambda: _get_list_env(
             "ALLOWED_ORIGINS",

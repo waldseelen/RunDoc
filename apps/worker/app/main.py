@@ -1,6 +1,7 @@
 """
-Pandoc Orchestrator — FastAPI Worker
-Ana giriş noktası ve API rotaları.
+RunDoc — FastAPI Worker
+Anonim doküman dönüştürme API'si.
+Kullanıcılar dosya yükler, dönüştürür ve indirir. Hesap/giriş gerektirmez.
 """
 
 import os
@@ -11,8 +12,9 @@ import logging
 from enum import Enum
 from typing import Optional, List, Dict, Any
 from pathlib import Path
+import asyncio
 
-from fastapi import FastAPI, HTTPException, UploadFile, File, Form, BackgroundTasks, Depends, Header, Request, APIRouter
+from fastapi import FastAPI, HTTPException, UploadFile, File, Form, BackgroundTasks, Request, APIRouter
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field, field_validator
@@ -111,9 +113,9 @@ _SAFE_KEY_PATTERN = re.compile(r"^[A-Za-z_][A-Za-z0-9_.-]{0,63}$")
 # =============================================
 
 app = FastAPI(
-    title="Pandoc Orchestrator Worker",
-    description="Pandoc dönüşüm motorunu yöneten worker servisi",
-    version="0.1.0",
+    title="RunDoc Worker",
+    description="Anonim doküman dönüştürme servisi — dosya yükle, dönüştür, indir.",
+    version="1.0.0",
     docs_url="/docs",
     redoc_url="/redoc"
 )
@@ -138,9 +140,9 @@ def rate_limit(limit: str):
 app.add_middleware(
     CORSMiddleware,
     allow_origins=settings.allowed_origins,
-    allow_credentials=True,
+    allow_credentials=False,
     allow_methods=["GET", "POST", "OPTIONS"],
-    allow_headers=["Authorization", "Content-Type", "X-Request-ID"],
+    allow_headers=["Content-Type", "X-Request-ID"],
 )
 
 # Tracing & Audit Middleware
@@ -195,30 +197,6 @@ os.makedirs(settings.worker_temp_dir, exist_ok=True)
 app.mount("/outputs", StaticFiles(directory=settings.worker_temp_dir), name="outputs")
 
 
-def _extract_bearer_token(authorization: Optional[str]) -> Optional[str]:
-    if not authorization:
-        return None
-    parts = authorization.split(" ", 1)
-    if len(parts) != 2 or parts[0].lower() != "bearer":
-        return None
-    token = parts[1].strip()
-    return token or None
-
-
-async def verify_access_token(authorization: Optional[str] = Header(default=None)) -> Dict[str, Any]:
-    """API endpointleri için token doğrulaması (Firebase-free Sandbox)."""
-    if not settings.worker_require_auth:
-        return {"uid": "anonymous", "provider": "disabled"}
-
-    token = _extract_bearer_token(authorization)
-    if not token:
-        raise HTTPException(status_code=401, detail="Authorization Bearer token gerekli")
-
-    if settings.worker_api_token and token == settings.worker_api_token:
-        return {"uid": "worker-api-token", "provider": "shared-secret"}
-
-    # Firebase kaldırıldığı için tüm geçerli Bearer token'ları Sandbox kullanıcısı olarak kabul et
-    return {"uid": "sandbox-user", "provider": "sandbox"}
 
 
 # =============================================
@@ -264,8 +242,7 @@ async def health_check():
     return {
         "status": overall_status,
         "pandoc_available": pandoc_available,
-        "auth_required": settings.worker_require_auth,
-        "version": "0.1.0"
+        "version": "1.0.0"
     }
 
 
@@ -284,7 +261,7 @@ async def list_formats():
     }
 
 
-# convert ve status asenkron rotaları Firebase kaldırıldığı için devre dışı bırakılmıştır.
+
 
 
 @api_router.post("/convert-direct", response_model=ConversionStatus)
@@ -304,13 +281,11 @@ async def convert_direct(
     highlight_style: str = Form(default="pygments"),
     math_rendering: str = Form(default="mathjax"),
     extract_media: bool = Form(default=False),
-    auth_ctx: Dict[str, Any] = Depends(verify_access_token)
 ):
     """
-    Firebase/Firestore bağımlılığı olmadan doğrudan dosya veya ham metin dönüştürme gerçekleştirir.
+    Doğrudan dosya veya ham metin dönüştürme gerçekleştirir.
     Sonuçlar FastAPI statik dosya sunucusu üzerinden anında indirilebilir ve önizlenebilir.
     """
-    _ = auth_ctx
     _ = http_request
 
     # Disk alanını kontrol et
@@ -413,8 +388,6 @@ async def convert_direct(
 
             # Log loglarını yerel cache'e kaydet (durum sorguları için)
             MOCK_LOGS[job_id] = {
-                "project_id": "direct",
-                "user_id": auth_ctx.get("uid", "direct"),
                 "input_format": input_format,
                 "output_format": output_format_value,
                 "engine_used": engine_to_use,
@@ -462,13 +435,11 @@ async def analyze_document(
     http_request: Request,
     file: UploadFile = File(...),
     target_format: OutputFormat = Form(default=OutputFormat.PDF),
-    auth_ctx: Dict[str, Any] = Depends(verify_access_token)
 ):
     """
     Yüklenen dokümanı analiz eder ve önerilen dönüşüm seçeneklerini döndürür.
     Dosya kalıcı olarak saklanmaz, sadece analiz için geçici olarak işlenir.
     """
-    _ = auth_ctx
     _ = http_request
 
     # Geçici dosya oluştur
@@ -512,3 +483,49 @@ async def analyze_document(
 # Register API Router
 app.include_router(api_router, prefix="/api/v1")
 app.include_router(api_router)
+
+
+# =============================================
+# BACKGROUND CLEANER — Otomatik Geçici Dosya Temizleyici
+# 30 dakikadan eski tüm dönüşüm klasörlerini siler.
+# Kullanıcı gizliliğini korur ve disk dolmasını engeller.
+# =============================================
+
+CLEANUP_INTERVAL_SECONDS = 600   # Her 10 dakikada bir kontrol
+CLEANUP_MAX_AGE_SECONDS = 1800   # 30 dakikadan eski dosyaları sil
+
+
+async def _cleanup_old_workdirs():
+    """Arka plan görevi: temp_workdir içindeki eski dönüşüm klasörlerini temizler."""
+    while True:
+        try:
+            await asyncio.sleep(CLEANUP_INTERVAL_SECONDS)
+            workdir = Path(settings.worker_temp_dir)
+            if not workdir.exists():
+                continue
+
+            now = time.time()
+            cleaned = 0
+            for entry in workdir.iterdir():
+                if not entry.is_dir():
+                    continue
+                try:
+                    age = now - entry.stat().st_mtime
+                    if age > CLEANUP_MAX_AGE_SECONDS:
+                        shutil.rmtree(entry, ignore_errors=True)
+                        cleaned += 1
+                except OSError:
+                    pass
+
+            if cleaned > 0:
+                logger.info(f"Otomatik temizlik: {cleaned} eski dönüşüm klasörü silindi.")
+        except Exception as e:
+            logger.error(f"Temizlik görevi hatası: {e}")
+
+
+@app.on_event("startup")
+async def start_background_cleaner():
+    """Sunucu başlatıldığında arka plan temizleyiciyi çalıştırır."""
+    asyncio.create_task(_cleanup_old_workdirs())
+    logger.info("Arka plan dosya temizleyici başlatıldı (aralık: %ds, max yaş: %ds)",
+                CLEANUP_INTERVAL_SECONDS, CLEANUP_MAX_AGE_SECONDS)

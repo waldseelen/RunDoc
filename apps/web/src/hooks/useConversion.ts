@@ -7,39 +7,6 @@ import { WORKER_API_URL } from "@/lib/config";
 // Types
 // =============================================
 
-export interface ConversionRequest {
-  project_id: string;
-  user_id: string;
-  input_document_id: string;
-  input_format?: string;
-  output_format: string;
-  engine?: string;
-  citeproc?: boolean;
-  bibliography_id?: string;
-  csl_style?: string;
-  reference_doc_id?: string;
-  template_id?: string;
-  lua_filter_ids?: string[];
-  python_filter_ids?: string[];
-  toc?: boolean;
-  toc_depth?: number;
-  smart?: boolean;
-  number_sections?: boolean;
-  standalone?: boolean;
-  highlight_style?: string;
-  math_rendering?: string;
-  extract_media?: boolean;
-  variables?: Record<string, string>;
-  metadata?: Record<string, string>;
-  additional_input_ids?: string[];
-}
-
-export interface ConversionResponse {
-  job_id: string;
-  status: string;
-  message: string;
-}
-
 export interface ConversionStatus {
   job_id: string;
   status: "pending" | "processing" | "completed" | "failed";
@@ -74,26 +41,6 @@ export interface FormatsResponse {
 
 const DEFAULT_TIMEOUT_MS = 30_000;
 
-export function getWorkerAuthToken(): string | null {
-  if (typeof window === "undefined") return process.env.NEXT_PUBLIC_WORKER_API_TOKEN ?? null;
-
-  const localToken = window.localStorage.getItem("worker_api_token");
-  if (localToken) return localToken;
-
-  return process.env.NEXT_PUBLIC_WORKER_API_TOKEN ?? null;
-}
-
-function buildAuthHeaders(extra?: HeadersInit): Headers {
-  const headers = new Headers(extra);
-  const token = getWorkerAuthToken();
-
-  if (token && !headers.has("Authorization")) {
-    headers.set("Authorization", `Bearer ${token}`);
-  }
-
-  return headers;
-}
-
 async function fetchWithTimeout(url: string, options?: RequestInit, timeoutMs: number = DEFAULT_TIMEOUT_MS) {
   const controller = new AbortController();
   const timeoutId = window.setTimeout(() => controller.abort(), timeoutMs);
@@ -109,7 +56,7 @@ async function fetchWithTimeout(url: string, options?: RequestInit, timeoutMs: n
 }
 
 async function fetchJSON<T>(url: string, options?: RequestInit): Promise<T> {
-  const headers = buildAuthHeaders(options?.headers);
+  const headers = new Headers(options?.headers);
   if (!headers.has("Content-Type")) {
     headers.set("Content-Type", "application/json");
   }
@@ -164,8 +111,6 @@ export function useFormats() {
   });
 }
 
-
-
 /**
  * Doküman analizi
  */
@@ -185,7 +130,6 @@ export function useAnalyzeDocument() {
       const response = await fetchWithTimeout(`${WORKER_API_URL}/api/v1/analyze`, {
         method: "POST",
         body: formData,
-        headers: buildAuthHeaders(),
       });
 
       if (!response.ok) {

@@ -1,33 +1,23 @@
 from fastapi.testclient import TestClient
 
 from app.main import app
-from app.config import settings
 
 
 client = TestClient(app)
 
 
-def _set_auth(required: bool, token: str = ""):
-    settings.worker_require_auth = required
-    settings.worker_api_token = token
-
-
-def test_health_endpoint_returns_runtime_flags():
-    _set_auth(False)
+def test_health_endpoint_returns_status():
     response = client.get("/health")
 
     assert response.status_code == 200
     payload = response.json()
     assert "pandoc_available" in payload
-    assert payload["auth_required"] is False
+    assert "version" in payload
 
 
-def test_convert_direct_accepts_shared_token_auth():
-    _set_auth(True, token="test-token")
-
+def test_convert_direct_no_auth_required():
     response = client.post(
         "/convert-direct",
-        headers={"Authorization": "Bearer test-token"},
         data={
             "text": "# Test",
             "output_format": "html",
@@ -40,27 +30,24 @@ def test_convert_direct_accepts_shared_token_auth():
     assert payload["status"] in {"completed", "failed"}
 
 
-def test_analyze_requires_auth_when_enabled():
-    _set_auth(True, token="test-token")
-
+def test_analyze_no_auth_required():
     response = client.post(
         "/analyze",
         files={"file": ("doc.md", b"# test", "text/markdown")},
         data={"target_format": "pdf"},
     )
 
-    assert response.status_code == 401
+    # Should succeed without auth
+    assert response.status_code == 200
 
 
 def test_api_versioning_prefix():
-    _set_auth(False)
     response = client.get("/api/v1/health")
     assert response.status_code == 200
     assert response.json()["pandoc_available"] is True
 
 
 def test_request_id_tracing_middleware():
-    _set_auth(False)
     # 1. Check generated request ID when header is missing
     response = client.get("/api/v1/health")
     assert response.status_code == 200
@@ -76,8 +63,6 @@ def test_request_id_tracing_middleware():
 
 
 def test_disk_space_validator_check(monkeypatch):
-    _set_auth(False)
-
     # Mock shutil.disk_usage to return 0 free space
     import shutil
     def mock_disk_usage(path):

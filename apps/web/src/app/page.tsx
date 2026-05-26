@@ -1,719 +1,621 @@
 "use client";
 
-import { useState, useMemo } from "react";
+import { useState, useCallback, useMemo } from "react";
+import dynamic from "next/dynamic";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
 import {
-  Plus,
-  FolderOpen,
-  Clock,
   Zap,
   FileText,
-  ArrowRight,
-  Search,
-  Settings,
-  Layers,
-  ChevronLeft,
-  Menu,
-  HelpCircle,
-  TrendingUp,
-  FileCode,
-  CheckCircle2,
+  FileUp,
+  PenLine,
+  Download,
+  Eye,
   Loader2,
+  CheckCircle2,
+  Shield,
   Globe,
   Sun,
   Moon,
   Sparkles,
-  BookOpen,
-  Code2,
-  Shield,
-  Star,
-  Activity,
+  ArrowRight,
+  RotateCcw,
+  Clock,
+  FileCode,
+  AlertCircle,
+  ChevronDown,
+  Trash2,
+  Upload,
 } from "lucide-react";
 import { useAppSettings } from "@/hooks/useAppSettings";
 import BrandLogo from "@/components/brand-logo";
-import { getWorkerAuthToken } from "@/hooks/useConversion";
+import Uploader from "@/components/uploader";
+
+// Monaco Editor'ü SSR devre dışı bırakarak yükle
+const CodeEditor = dynamic(() => import("@/components/editor"), { ssr: false });
 
 // =============================================
-// Static Demo Projects
+// Format & Engine Data
 // =============================================
-const INITIAL_PROJECTS = [
-  {
-    id: "demo-1",
-    name: "Akademik Makale",
-    description: "Kuantum Hesaplama araştırma makalesi ve formülleri",
-    nameEn: "Academic Paper",
-    descriptionEn: "Quantum Computing research paper and formulas",
-    format: "PDF (XeLaTeX)",
-    updatedAt: "2 saat önce",
-    updatedAtEn: "2 hours ago",
-    status: "completed" as const,
-  },
-  {
-    id: "demo-2",
-    name: "API Dokümantasyonu",
-    description: "Pandoc worker modülü REST API teknik referansı",
-    nameEn: "API Documentation",
-    descriptionEn: "Pandoc worker module REST API technical reference",
-    format: "HTML",
-    updatedAt: "5 saat önce",
-    updatedAtEn: "5 hours ago",
-    status: "completed" as const,
-  },
-  {
-    id: "demo-3",
-    name: "Kurumsal Performans Raporu",
-    description: "Q2 2026 finansal performans ve çıktı analizi",
-    nameEn: "Corporate Performance Report",
-    descriptionEn: "Q2 2026 financial performance and output analysis",
-    format: "DOCX",
-    updatedAt: "1 gün önce",
-    updatedAtEn: "1 day ago",
-    status: "processing" as const,
-  },
+
+const OUTPUT_FORMATS = [
+  { value: "pdf", label: "📕 PDF", group: "Doküman" },
+  { value: "docx", label: "📄 Word (.docx)", group: "Doküman" },
+  { value: "html", label: "🌐 HTML5", group: "Web" },
+  { value: "epub", label: "📚 EPUB eBook", group: "Yayıncılık" },
+  { value: "pptx", label: "📊 PowerPoint", group: "Sunum" },
+  { value: "odt", label: "📄 OpenDocument", group: "Doküman" },
+  { value: "latex", label: "📐 LaTeX", group: "Akademik" },
+  { value: "typst", label: "📐 Typst", group: "Akademik" },
+  { value: "revealjs", label: "📊 reveal.js Slayt", group: "Sunum" },
+  { value: "markdown", label: "📝 Markdown", group: "Markup" },
+  { value: "rst", label: "📝 reStructuredText", group: "Markup" },
+  { value: "rtf", label: "📄 Rich Text", group: "Doküman" },
+  { value: "plain", label: "📋 Düz Metin", group: "Veri" },
 ];
 
-export default function DashboardPage() {
-  const router = useRouter();
-  const { theme, language, toggleTheme, toggleLanguage, t, mounted } = useAppSettings();
-  
-  // States
-  const [sidebarOpen, setSidebarOpen] = useState(true);
-  const [activeTab, setActiveTab] = useState("all-projects");
-  const [searchQuery, setSearchQuery] = useState("");
-  
-  // Onboarding Wizard States
-  const [onboardText, setOnboardText] = useState(
-    `# RunDoc Deneme Belgesi\n\nBu doküman **sihirbaz** aracılığıyla derlenmektedir.\n\n$$\\int_0^\\infty e^{-x^2} dx = \\frac{\\sqrt{\\pi}}{2}$$\n\n* **Kolay:** Kod yazmadan anında çıktı.\n* **Hızlı:** Yerel derleme gücü.\n`
-  );
-  const [onboardFormat, setOnboardFormat] = useState("pdf");
-  const [onboardStatus, setOnboardStatus] = useState<"idle" | "compiling" | "success" | "failed">("idle");
-  const [onboardJobId, setOnboardJobId] = useState<string | null>(null);
-  const [onboardError, setOnboardError] = useState("");
+const OUTPUT_EXT_MAP: Record<string, string> = {
+  pdf: "pdf", docx: "docx", odt: "odt", html: "html",
+  html5: "html", epub: "epub", epub3: "epub", latex: "tex",
+  pptx: "pptx", revealjs: "html", beamer: "pdf",
+  markdown: "md", gfm: "md", rst: "rst", json: "json",
+  plain: "txt", rtf: "rtf", typst: "typ",
+};
 
-  // Handle Onboarding Compilation (Direct API Connect)
-  const handleOnboardCompile = async () => {
-    setOnboardStatus("compiling");
-    setOnboardError("");
-    
+const DEFAULT_MARKDOWN = `# Merhaba Dünya! 🌍
+
+Bu belge **RunDoc** ile dönüştürülecektir.
+
+## Matematiksel Formül
+
+$$E = mc^2$$
+
+## Özellikler
+
+- ⚡ **Hızlı:** Saniyeler içinde dönüşüm
+- 🔒 **Güvenli:** Dosyalar sunucuda saklanmaz
+- 🆓 **Ücretsiz:** Hesap gerektirmez
+
+## Kod Örneği
+
+\`\`\`python
+def merhaba():
+    print("RunDoc ile dönüştürüldü!")
+\`\`\`
+
+| Format | Destek |
+|--------|--------|
+| PDF    | ✅     |
+| DOCX   | ✅     |
+| HTML   | ✅     |
+| EPUB   | ✅     |
+`;
+
+type InputMode = "editor" | "upload";
+type ConversionState = "idle" | "converting" | "completed" | "failed";
+
+export default function HomePage() {
+  const { theme, language, toggleTheme, toggleLanguage, t, mounted } = useAppSettings();
+
+  // Input State
+  const [inputMode, setInputMode] = useState<InputMode>("editor");
+  const [editorContent, setEditorContent] = useState(DEFAULT_MARKDOWN);
+  const [uploadedFiles, setUploadedFiles] = useState<File[]>([]);
+
+  // Conversion State
+  const [outputFormat, setOutputFormat] = useState("pdf");
+  const [conversionState, setConversionState] = useState<ConversionState>("idle");
+  const [outputUrl, setOutputUrl] = useState<string | null>(null);
+  const [errorMessage, setErrorMessage] = useState("");
+  const [executionTimeMs, setExecutionTimeMs] = useState<number | undefined>(undefined);
+  const [progress, setProgress] = useState(0);
+  const [showAdvanced, setShowAdvanced] = useState(false);
+
+  // Advanced options
+  const [engine, setEngine] = useState("typst");
+  const [toc, setToc] = useState(false);
+  const [smart, setSmart] = useState(true);
+  const [standalone, setStandalone] = useState(true);
+
+  const handleFilesSelected = useCallback((files: File[]) => {
+    setUploadedFiles((prev) => [...prev, ...files]);
+  }, []);
+
+  const handleRemoveFile = useCallback((index: number) => {
+    setUploadedFiles((prev) => prev.filter((_, i) => i !== index));
+  }, []);
+
+  // Progress animation
+  const startProgress = useCallback(() => {
+    setProgress(5);
+    const interval = setInterval(() => {
+      setProgress((prev) => {
+        if (prev >= 92) return prev;
+        const increment = prev < 50 ? 8 : prev < 75 ? 4 : 1.5;
+        return Math.min(prev + increment, 95);
+      });
+    }, 250);
+    return interval;
+  }, []);
+
+  // Convert handler
+  const handleConvert = useCallback(async () => {
+    setConversionState("converting");
+    setErrorMessage("");
+    setOutputUrl(null);
+    setExecutionTimeMs(undefined);
+
+    const progressInterval = startProgress();
+
     try {
       const formData = new FormData();
-      formData.append("text", onboardText);
-      formData.append("output_format", onboardFormat);
-      formData.append("standalone", "true");
-      formData.append("smart", "true");
-      formData.append("math_rendering", "mathjax");
 
-      const token = getWorkerAuthToken();
-      const headers: Record<string, string> = {};
-      if (token) {
-        headers["Authorization"] = `Bearer ${token}`;
+      if (inputMode === "upload" && uploadedFiles.length > 0) {
+        formData.append("file", uploadedFiles[0]);
+      } else {
+        formData.append("text", editorContent);
       }
+
+      formData.append("output_format", outputFormat);
+      formData.append("engine", engine);
+      formData.append("toc", toc ? "true" : "false");
+      formData.append("smart", smart ? "true" : "false");
+      formData.append("standalone", standalone ? "true" : "false");
+      formData.append("math_rendering", "mathjax");
 
       const response = await fetch(`${process.env.NEXT_PUBLIC_WORKER_API_URL || "http://localhost:8000"}/api/v1/convert-direct`, {
         method: "POST",
-        headers,
         body: formData,
       });
 
+      clearInterval(progressInterval);
+
       if (!response.ok) {
-        throw new Error(`Dönüşüm başarısız: ${response.statusText}`);
+        const errText = await response.text();
+        throw new Error(`Dönüşüm başarısız: ${response.status} - ${errText}`);
       }
 
       const result = await response.json();
       if (result.status === "completed") {
-        setOnboardStatus("success");
-        setOnboardJobId(result.job_id);
+        setProgress(100);
+        setConversionState("completed");
+        setOutputUrl(result.output_url);
+        setExecutionTimeMs(result.execution_time_ms);
       } else {
-        setOnboardStatus("failed");
-        setOnboardError(result.error_message || "Derleme hatası oluştu.");
+        setConversionState("failed");
+        setErrorMessage(result.error_message || "Derleme hatası oluştu.");
+        setProgress(0);
       }
     } catch (err: any) {
-      setOnboardStatus("failed");
-      setOnboardError(err.message || "Bağlantı hatası: Python worker ayakta mı?");
+      clearInterval(progressInterval);
+      setConversionState("failed");
+      setErrorMessage(err.message || "Bağlantı hatası: Python worker ayakta mı?");
+      setProgress(0);
     }
-  };
+  }, [editorContent, inputMode, uploadedFiles, outputFormat, engine, toc, smart, standalone, startProgress]);
 
-  // Memoized Search Filter
-  const filteredProjects = useMemo(() => {
-    return INITIAL_PROJECTS.filter((proj) => {
-      const name = language === "tr" ? proj.name : proj.nameEn;
-      const desc = language === "tr" ? proj.description : proj.descriptionEn;
-      const query = searchQuery.toLowerCase();
-      return name.toLowerCase().includes(query) || desc.toLowerCase().includes(query) || proj.format.toLowerCase().includes(query);
-    });
-  }, [searchQuery, language]);
+  // Reset
+  const handleReset = useCallback(() => {
+    setConversionState("idle");
+    setOutputUrl(null);
+    setErrorMessage("");
+    setProgress(0);
+    setExecutionTimeMs(undefined);
+  }, []);
 
-  if (!mounted) return null; // Avoid hydration flash
+  // Preview checks
+  const isPDF = outputFormat === "pdf" || outputFormat === "beamer";
+  const isHTML = ["html", "html5", "revealjs"].includes(outputFormat);
+  const canPreview = (isPDF || isHTML) && outputUrl;
+
+  const hasInput = inputMode === "upload" ? uploadedFiles.length > 0 : editorContent.trim().length > 0;
+
+  if (!mounted) return null;
 
   return (
-    <div className="min-h-screen flex text-[var(--foreground)] transition-colors duration-200" style={{ background: "var(--background)" }}>
-      {/* Ambient Radial Glow */}
-      <div
-        className="fixed inset-0 pointer-events-none"
-        style={{
-          background: "var(--gradient-glow)",
-          zIndex: 0,
-        }}
-      />
+    <div className="min-h-screen flex flex-col text-[var(--foreground)] transition-colors duration-200" style={{ background: "var(--background)" }}>
+      {/* Ambient Glow */}
+      <div className="fixed inset-0 pointer-events-none" style={{ background: "var(--gradient-glow)", zIndex: 0 }} />
 
-      {/* Left Sidebar (Notion/Linear style) */}
-      <aside
-        className={`relative z-20 flex-shrink-0 flex flex-col transition-all duration-300 ease-in-out border-r border-[var(--border)]`}
-        style={{
-          width: sidebarOpen ? "260px" : "0px",
-          opacity: sidebarOpen ? 1 : 0,
-          background: "var(--sidebar-bg)",
-          backdropFilter: "blur(16px)",
-          overflow: "hidden",
-        }}
-      >
-        {/* Workspace Brand Selector */}
-        <div className="p-4 flex items-center justify-between border-b border-[var(--border)]">
-          <div className="flex items-center gap-2.5">
-            <BrandLogo size={28} />
-            <div className="flex flex-col min-w-0">
-              <span className="text-xs font-semibold tracking-tight truncate">{t("brand_title")}</span>
-              <span className="text-[10px] text-[var(--foreground-muted)]">{t("brand_sub")}</span>
-            </div>
+      {/* Top Navigation */}
+      <header className="relative z-20 px-6 py-3 border-b border-[var(--border)] bg-[var(--background-secondary)]/60 backdrop-blur-md flex items-center justify-between">
+        <div className="flex items-center gap-3">
+          <BrandLogo size={28} />
+          <div className="flex flex-col min-w-0">
+            <span className="text-xs font-bold tracking-tight">RunDoc</span>
+            <span className="text-[10px] text-[var(--foreground-muted)]">
+              {language === "tr" ? "Ücretsiz Doküman Dönüştürücü" : "Free Document Converter"}
+            </span>
           </div>
-          <button
-            onClick={() => setSidebarOpen(false)}
-            className="p-1.5 rounded-md hover:bg-[var(--surface-hover)] text-[var(--foreground-muted)] hover:text-[var(--foreground-secondary)] transition-colors cursor-pointer"
-          >
-            <ChevronLeft size={16} />
+        </div>
+
+        <div className="flex items-center gap-2">
+          <button onClick={toggleTheme} className="p-2 rounded-lg hover:bg-[var(--surface-hover)] text-[var(--foreground-muted)] hover:text-[var(--foreground)] transition-colors cursor-pointer" title={theme === "dark" ? "Light Mode" : "Dark Mode"}>
+            {theme === "dark" ? <Sun size={16} /> : <Moon size={16} />}
+          </button>
+          <button onClick={toggleLanguage} className="p-2 rounded-lg hover:bg-[var(--surface-hover)] text-[var(--foreground-muted)] hover:text-[var(--foreground)] transition-colors cursor-pointer" title={language === "tr" ? "English" : "Türkçe"}>
+            <Globe size={16} />
           </button>
         </div>
+      </header>
 
-        {/* Global Search Input */}
-        <div className="px-3 pt-4 pb-2">
-          <div className="relative">
-            <Search size={14} className="absolute left-3 top-2.5 text-[var(--foreground-muted)]" />
-            <input
-              type="text"
-              placeholder={t("search_placeholder")}
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              className="w-full pl-9 pr-3 py-2 rounded-lg text-xs text-[var(--foreground)] bg-[var(--background-tertiary)] border border-[var(--border)] focus:outline-none focus:border-[var(--accent)] focus:ring-2 focus:ring-[var(--accent-glow)] transition-all"
-            />
-          </div>
-        </div>
+      {/* Main Content */}
+      <main className="flex-1 relative z-10 overflow-y-auto">
+        <div className="max-w-4xl w-full mx-auto px-6 py-10 space-y-8">
 
-        {/* Navigation Groups */}
-        <nav className="flex-1 overflow-y-auto px-2 py-3 space-y-6">
-          <div className="space-y-1">
-            <p className="px-3 text-[10px] font-bold tracking-wider text-[var(--foreground-muted)] uppercase">{t("nav_workspace")}</p>
-            <button
-              onClick={() => setActiveTab("all-projects")}
-              className={`w-full flex items-center gap-2.5 px-3 py-2 rounded-lg text-xs transition-all cursor-pointer ${
-                activeTab === "all-projects"
-                  ? "bg-[var(--surface)] text-[var(--foreground)] font-semibold shadow-sm border border-[var(--border)]"
-                  : "text-[var(--foreground-secondary)] hover:bg-[var(--surface-hover)] hover:text-[var(--foreground)]"
-              }`}
-            >
-              <FolderOpen size={14} />
-              <span>{t("nav_projects")}</span>
-            </button>
-            <button
-              onClick={() => setActiveTab("templates")}
-              className={`w-full flex items-center gap-2.5 px-3 py-2 rounded-lg text-xs transition-all cursor-pointer ${
-                activeTab === "templates"
-                  ? "bg-[var(--surface)] text-[var(--foreground)] font-semibold shadow-sm border border-[var(--border)]"
-                  : "text-[var(--foreground-secondary)] hover:bg-[var(--surface-hover)] hover:text-[var(--foreground)]"
-              }`}
-            >
-              <FileText size={14} />
-              <span>{t("nav_templates")}</span>
-            </button>
-            <button
-              onClick={() => setActiveTab("filters")}
-              className={`w-full flex items-center gap-2.5 px-3 py-2 rounded-lg text-xs transition-all cursor-pointer ${
-                activeTab === "filters"
-                  ? "bg-[var(--surface)] text-[var(--foreground)] font-semibold shadow-sm border border-[var(--border)]"
-                  : "text-[var(--foreground-secondary)] hover:bg-[var(--surface-hover)] hover:text-[var(--foreground)]"
-              }`}
-            >
-              <Layers size={14} />
-              <span>{t("nav_filters")}</span>
-            </button>
-          </div>
-
-          <div className="space-y-1">
-            <p className="px-3 text-[10px] font-bold tracking-wider text-[var(--foreground-muted)] uppercase">{t("nav_recent_updates")}</p>
-            {INITIAL_PROJECTS.map((proj) => (
-              <Link
-                key={proj.id}
-                href={`/workspace/${proj.id}`}
-                className="w-full flex items-center gap-2 px-3 py-1.5 rounded-lg text-[11px] text-[var(--foreground-secondary)] hover:text-[var(--foreground)] hover:bg-[var(--surface-hover)] transition-all truncate"
-              >
-                <div className="w-1.5 h-1.5 rounded-full bg-[var(--accent)] flex-shrink-0" />
-                <span className="truncate">{language === "tr" ? proj.name : proj.nameEn}</span>
-              </Link>
-            ))}
-          </div>
-        </nav>
-
-        {/* Sidebar Footer */}
-        <div className="p-4 border-t border-[var(--border)] flex items-center justify-between text-xs text-[var(--foreground-muted)]">
-          <div className="flex items-center gap-2">
-            <BrandLogo size={20} />
-            <span className="text-[10px] font-mono">{t("nav_version")}</span>
-          </div>
-          
-          <div className="flex items-center gap-1">
-            <button
-              onClick={toggleTheme}
-              className="p-1.5 rounded-md hover:bg-[var(--surface-hover)] hover:text-[var(--foreground)] transition-colors cursor-pointer"
-              title={theme === "dark" ? "Light Mode" : "Dark Mode"}
-            >
-              {theme === "dark" ? <Sun size={14} /> : <Moon size={14} />}
-            </button>
-
-            <button
-              onClick={toggleLanguage}
-              className="p-1.5 rounded-md hover:bg-[var(--surface-hover)] hover:text-[var(--foreground)] transition-colors cursor-pointer font-bold text-[10px]"
-              title={language === "tr" ? "English" : "Türkçe"}
-            >
-              <Globe size={14} />
-            </button>
-
-            <button 
-              onClick={() => router.push("/workspace/settings")}
-              className="p-1.5 rounded-md hover:bg-[var(--surface-hover)] hover:text-[var(--foreground)] transition-colors cursor-pointer"
-              title="Workspace Settings"
-            >
-              <Settings size={14} />
-            </button>
-          </div>
-        </div>
-      </aside>
-
-      {/* Closed Sidebar Floating Trigger */}
-      {!sidebarOpen && (
-        <button
-          onClick={() => setSidebarOpen(true)}
-          className="fixed top-4 left-4 z-30 p-2 rounded-lg border border-[var(--border)] bg-[var(--background-secondary)] text-[var(--foreground-secondary)] hover:text-[var(--foreground)] transition-all cursor-pointer shadow-lg backdrop-blur-sm"
-        >
-          <Menu size={16} />
-        </button>
-      )}
-
-      {/* Main Content Area */}
-      <main className="flex-1 min-w-0 flex flex-col relative z-10 overflow-y-auto">
-        {/* Top Nav Header */}
-        <header className="px-6 py-3 border-b border-[var(--border)] flex items-center justify-between bg-[var(--background-secondary)]/60 backdrop-blur-md sticky top-0 z-10">
-          <div className="flex items-center gap-3">
-            <div className="flex items-center gap-1.5 text-xs">
-              <span className="text-[var(--foreground-muted)]">Workspace</span>
-              <span className="text-[var(--border)]">/</span>
-              <span className="font-semibold text-[var(--foreground)]">
-                {activeTab === "all-projects" ? t("nav_projects") : activeTab === "templates" ? t("nav_templates") : t("nav_filters")}
-              </span>
+          {/* Hero */}
+          <div className="text-center space-y-4 animate-fade-in">
+            <div className="flex items-center justify-center gap-3">
+              <BrandLogo size={48} />
             </div>
-            <span className="badge badge-info text-[9px] font-bold px-1.5 py-0.5 rounded-full">{t("badge_beta")}</span>
-          </div>
-
-          <div className="flex items-center gap-3">
-            <Link href="/workspace/new" className="btn-primary py-2 px-4 text-xs rounded-lg shadow-sm transition-all" id="new-project-btn">
-              <Plus size={14} />
-              {t("new_project_btn")}
-            </Link>
-          </div>
-        </header>
-
-        {/* Dashboard Grid Container */}
-        <div className="max-w-5xl w-full mx-auto px-6 py-10 space-y-10 flex-1">
-          
-          {/* ============================================= */}
-          {/* HERO SECTION — Brand Identity + Trust Signals */}
-          {/* ============================================= */}
-          <div className="relative overflow-hidden rounded-2xl border border-[var(--border)] bg-gradient-to-br from-[var(--surface)] to-[var(--background-secondary)] p-8 animate-fade-in">
-            {/* Decorative gradient overlay */}
-            <div className="absolute inset-0 pointer-events-none" style={{
-              background: "radial-gradient(ellipse 60% 50% at 70% 20%, rgba(94, 97, 230, 0.08) 0%, transparent 70%)"
-            }} />
-            
-            <div className="relative z-10 flex flex-col md:flex-row items-start md:items-center gap-6">
-              <div className="flex-1 space-y-3">
-                <div className="flex items-center gap-3">
-                  <BrandLogo size={40} />
-                  <div>
-                    <h1 className="text-2xl font-bold tracking-tight text-[var(--foreground)]">
-                      {t("welcome_title")}
-                    </h1>
-                    <p className="text-sm font-semibold bg-gradient-to-r from-[#818cf8] via-[#a78bfa] to-[#c084fc] bg-clip-text text-transparent">
-                      {t("hero_tagline")}
-                    </p>
-                  </div>
-                </div>
-                <p className="text-sm text-[var(--foreground-secondary)] max-w-lg leading-relaxed">
-                  {t("hero_subtitle")}
-                </p>
-              </div>
-              
-              <button
-                onClick={() => router.push("/workspace/new")}
-                className="btn-primary py-3 px-6 text-sm rounded-xl whitespace-nowrap"
-              >
-                <Zap size={16} />
-                {t("hero_cta")}
-              </button>
-            </div>
+            <h1 className="text-3xl md:text-4xl font-bold tracking-tight">
+              {language === "tr" ? "Dosyalarınızı Anında Dönüştürün" : "Convert Your Files Instantly"}
+            </h1>
+            <p className="text-sm text-[var(--foreground-secondary)] max-w-xl mx-auto leading-relaxed">
+              {language === "tr"
+                ? "40+ format arasında ücretsiz, güvenli ve hızlı dönüşüm. Kayıt gerektirmez. Dosyalarınız sunucuda saklanmaz."
+                : "Free, secure & fast conversion between 40+ formats. No sign-up required. Your files are never stored."}
+            </p>
 
             {/* Trust Badges */}
-            <div className="relative z-10 flex flex-wrap items-center gap-6 mt-6 pt-6 border-t border-[var(--border)]">
-              <div className="flex items-center gap-2 text-xs text-[var(--foreground-secondary)]">
-                <div className="w-7 h-7 rounded-lg bg-[var(--success-bg)] text-[var(--success)] flex items-center justify-center">
-                  <TrendingUp size={14} />
-                </div>
-                <div>
-                  <span className="font-bold text-[var(--foreground)]">500K+</span>{" "}
-                  {t("trust_conversions")}
-                </div>
+            <div className="flex flex-wrap items-center justify-center gap-4 pt-2">
+              <div className="flex items-center gap-1.5 text-[11px] text-[var(--foreground-muted)]">
+                <Shield size={13} className="text-[var(--success)]" />
+                <span>{language === "tr" ? "Dosyalar saklanmaz" : "Files never stored"}</span>
               </div>
-              <div className="flex items-center gap-2 text-xs text-[var(--foreground-secondary)]">
-                <div className="w-7 h-7 rounded-lg bg-[var(--info-bg)] text-[var(--info)] flex items-center justify-center">
-                  <Activity size={14} />
-                </div>
-                <div>
-                  <span className="font-bold text-[var(--foreground)]">99.9%</span>{" "}
-                  {t("trust_uptime")}
-                </div>
+              <div className="flex items-center gap-1.5 text-[11px] text-[var(--foreground-muted)]">
+                <Zap size={13} className="text-[var(--warning)]" />
+                <span>{language === "tr" ? "Anında dönüşüm" : "Instant conversion"}</span>
               </div>
-              <div className="flex items-center gap-2 text-xs text-[var(--foreground-secondary)]">
-                <div className="w-7 h-7 rounded-lg bg-[var(--warning-bg)] text-[var(--warning)] flex items-center justify-center">
-                  <Star size={14} />
-                </div>
-                <div>
-                  <span className="font-bold text-[var(--foreground)]">4.8/5</span>{" "}
-                  {t("trust_rating")}
-                </div>
-              </div>
-              <div className="flex items-center gap-2 text-xs text-[var(--foreground-secondary)]">
-                <div className="w-7 h-7 rounded-lg bg-[var(--accent-subtle)] text-[var(--accent)] flex items-center justify-center">
-                  <Shield size={14} />
-                </div>
-                <div className="text-[var(--foreground-muted)]">
-                  {t("footer_data_safe")}
-                </div>
+              <div className="flex items-center gap-1.5 text-[11px] text-[var(--foreground-muted)]">
+                <Sparkles size={13} className="text-[var(--accent)]" />
+                <span>{language === "tr" ? "40+ format" : "40+ formats"}</span>
               </div>
             </div>
           </div>
 
-          {/* Stats Bar */}
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4 animate-slide-up" style={{ animationDelay: "100ms" }}>
-            <div className="glass-card p-5 flex items-center gap-4">
-              <div className="w-10 h-10 rounded-xl flex items-center justify-center text-[var(--accent)] bg-[var(--accent-subtle)]">
-                <TrendingUp size={18} />
-              </div>
-              <div>
-                <p className="text-2xl font-bold tracking-tight text-[var(--foreground)]">1,247</p>
-                <p className="text-[10px] uppercase font-bold tracking-wider text-[var(--foreground-muted)]">{t("stats_total_conversions")}</p>
-              </div>
-            </div>
-            <div className="glass-card p-5 flex items-center gap-4">
-              <div className="w-10 h-10 rounded-xl flex items-center justify-center text-[var(--info)] bg-[var(--info-bg)]">
-                <FileCode size={18} />
-              </div>
-              <div>
-                <p className="text-2xl font-bold tracking-tight text-[var(--foreground)]">40+</p>
-                <p className="text-[10px] uppercase font-bold tracking-wider text-[var(--foreground-muted)]">{t("stats_formats")}</p>
-              </div>
-            </div>
-            <div className="glass-card p-5 flex items-center gap-4">
-              <div className="w-10 h-10 rounded-xl flex items-center justify-center text-[var(--success)] bg-[var(--success-bg)]">
-                <FolderOpen size={18} />
-              </div>
-              <div>
-                <p className="text-2xl font-bold tracking-tight text-[var(--foreground)]">{filteredProjects.length}</p>
-                <p className="text-[10px] uppercase font-bold tracking-wider text-[var(--foreground-muted)]">{t("stats_active_projects")}</p>
-              </div>
-            </div>
-          </div>
+          {/* Main Converter Card */}
+          <div className="glass-card rounded-2xl border border-[var(--border)] overflow-hidden animate-slide-up" style={{ animationDelay: "100ms" }}>
 
-          {/* ONBOARDING COMPILER WIZARD */}
-          <div className="glass-card p-6 rounded-xl space-y-5 bg-[var(--background-secondary)]/30 backdrop-blur-sm animate-slide-up" style={{ animationDelay: "200ms" }}>
-            <div className="flex items-center gap-3">
-              <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-[#818cf8] to-[#a78bfa] text-white flex items-center justify-center shadow-md">
-                <Sparkles size={16} />
-              </div>
-              <div>
-                <h3 className="text-sm font-semibold text-[var(--foreground)]">{t("onboard_title")}</h3>
-                <p className="text-[11px] text-[var(--foreground-muted)]">{t("onboard_desc")}</p>
-              </div>
-            </div>
-
-            {/* Step Indicator */}
-            <div className="flex items-center gap-2">
-              {[
-                { num: 1, label: t("onboard_step1") },
-                { num: 2, label: t("onboard_step2") },
-                { num: 3, label: t("onboard_step3") },
-              ].map((step, i) => (
-                <div key={step.num} className="flex items-center gap-2">
-                  <div className={`w-6 h-6 rounded-full flex items-center justify-center text-[10px] font-bold transition-all ${
-                    (step.num === 1 && onboardText) || (step.num === 2 && onboardFormat) || (step.num === 3 && onboardStatus === "success")
-                      ? "bg-gradient-to-r from-[#818cf8] to-[#a78bfa] text-white shadow-sm"
-                      : "bg-[var(--background-tertiary)] text-[var(--foreground-muted)] border border-[var(--border)]"
-                  }`}>
-                    {(step.num === 3 && onboardStatus === "success") ? <CheckCircle2 size={12} /> : step.num}
-                  </div>
-                  <span className="text-[10px] text-[var(--foreground-secondary)] font-medium hidden sm:inline">{step.label}</span>
-                  {i < 2 && <div className="w-6 h-[1px] bg-[var(--border)]" />}
-                </div>
-              ))}
-            </div>
-            
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              {/* Input Editor */}
-              <div className="space-y-2">
-                <label className="text-[10px] font-bold uppercase tracking-wider text-[var(--foreground-secondary)]">{t("onboard_input_label")}</label>
-                <textarea
-                  value={onboardText}
-                  onChange={(e) => setOnboardText(e.target.value)}
-                  rows={6}
-                  className="w-full p-3 text-xs font-mono rounded-lg bg-[var(--background-tertiary)] border border-[var(--border)] focus:outline-none focus:border-[var(--accent)] focus:ring-2 focus:ring-[var(--accent-glow)] text-[var(--foreground)] resize-none transition-all"
-                />
-              </div>
-              
-              {/* Output Form & Trigger */}
-              <div className="flex flex-col justify-between space-y-3">
-                <div className="space-y-2">
-                  <label className="text-[10px] font-bold uppercase tracking-wider text-[var(--foreground-secondary)]">{t("onboard_format_label")}</label>
-                  <select
-                    value={onboardFormat}
-                    onChange={(e) => setOnboardFormat(e.target.value)}
-                    className="select-field text-xs"
+            {/* Step 1: Input Mode Tabs */}
+            <div className="p-4 border-b border-[var(--border)] bg-[var(--background-secondary)]/50 flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <div className="flex bg-[var(--background-tertiary)] p-0.5 rounded-lg border border-[var(--border)]">
+                  <button
+                    className={`flex items-center gap-1.5 px-4 py-2 rounded-md text-xs font-semibold cursor-pointer transition-all ${
+                      inputMode === "editor"
+                        ? "bg-[var(--background)] text-[var(--foreground)] border border-[var(--border)] shadow-sm"
+                        : "text-[var(--foreground-muted)] hover:text-[var(--foreground-secondary)] border border-transparent"
+                    }`}
+                    onClick={() => setInputMode("editor")}
+                    id="tab-editor"
                   >
-                    <option value="pdf">📕 PDF (Typst Engine)</option>
-                    <option value="html">🌐 HTML5 Web Output</option>
-                    <option value="docx">📄 Microsoft Word (.docx)</option>
-                    <option value="epub">📚 EPUB eBook</option>
-                  </select>
+                    <PenLine size={13} />
+                    {language === "tr" ? "Editör" : "Editor"}
+                  </button>
+                  <button
+                    className={`flex items-center gap-1.5 px-4 py-2 rounded-md text-xs font-semibold cursor-pointer transition-all ${
+                      inputMode === "upload"
+                        ? "bg-[var(--background)] text-[var(--foreground)] border border-[var(--border)] shadow-sm"
+                        : "text-[var(--foreground-muted)] hover:text-[var(--foreground-secondary)] border border-transparent"
+                    }`}
+                    onClick={() => setInputMode("upload")}
+                    id="tab-upload"
+                  >
+                    <FileUp size={13} />
+                    {language === "tr" ? "Dosya Yükle" : "Upload File"}
+                  </button>
                 </div>
+              </div>
 
-                {/* Compilation Success Notification */}
-                {onboardStatus === "success" && onboardJobId && (
-                  <div className="p-3 rounded-lg border border-[var(--success)]/20 bg-[var(--success-bg)] text-[var(--success)] flex items-center justify-between text-xs animate-slide-up">
-                    <div className="flex items-center gap-2">
-                      <CheckCircle2 size={14} />
-                      <span className="font-medium">{t("onboard_success")}</span>
-                    </div>
-                    <button
-                      onClick={() => router.push(`/workspace/sandbox?job_id=${onboardJobId}`)}
-                      className="py-1.5 px-3 rounded-md bg-[var(--success)] text-white text-[10px] font-semibold hover:opacity-90 transition-opacity flex items-center gap-1 cursor-pointer"
-                    >
-                      <span>İncele / Preview</span>
-                      <ArrowRight size={10} />
-                    </button>
-                  </div>
-                )}
-
-                {/* Compilation Error Notification */}
-                {onboardStatus === "failed" && (
-                  <div className="p-3 rounded-lg border border-[var(--error)]/15 bg-[var(--error-bg)] text-[var(--error)] text-[11px] leading-relaxed animate-slide-up flex items-start gap-2">
-                    <span className="mt-0.5">⚠️</span>
-                    <span>{onboardError}</span>
-                  </div>
-                )}
-
-                {/* Submit button */}
-                <button
-                  onClick={handleOnboardCompile}
-                  disabled={onboardStatus === "compiling"}
-                  className="btn-primary w-full py-3 rounded-lg flex items-center justify-center gap-2 cursor-pointer font-bold text-xs"
+              {/* Format Selector */}
+              <div className="flex items-center gap-3">
+                <label className="text-[10px] font-bold uppercase tracking-wider text-[var(--foreground-muted)] hidden sm:block">
+                  {language === "tr" ? "Çıktı:" : "Output:"}
+                </label>
+                <select
+                  value={outputFormat}
+                  onChange={(e) => setOutputFormat(e.target.value)}
+                  className="select-field text-xs h-9 min-w-[160px]"
+                  id="output-format-select"
                 >
-                  {onboardStatus === "compiling" ? (
+                  {OUTPUT_FORMATS.map((f) => (
+                    <option key={f.value} value={f.value}>
+                      {f.label}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            </div>
+
+            {/* Input Area */}
+            <div className="relative" style={{ minHeight: inputMode === "editor" ? "360px" : "auto" }}>
+              {inputMode === "editor" ? (
+                <div style={{ height: "360px" }}>
+                  <CodeEditor
+                    value={editorContent}
+                    onChange={setEditorContent}
+                    language="markdown"
+                    height="100%"
+                  />
+                </div>
+              ) : (
+                <div className="p-8 space-y-4">
+                  <Uploader
+                    onFilesSelected={handleFilesSelected}
+                    accept=".md,.markdown,.tex,.docx,.doc,.html,.htm,.epub,.rst,.adoc,.org,.json,.csv,.bib,.odt,.rtf,.txt,.ipynb,.typ,.pptx"
+                    maxSizeMB={50}
+                    multiple={false}
+                    label={language === "tr" ? "Dosyaları sürükleyin veya tıklayarak seçin" : "Drag files here or click to browse"}
+                  />
+
+                  {/* Uploaded Files List */}
+                  {uploadedFiles.length > 0 && (
+                    <div className="space-y-2">
+                      {uploadedFiles.map((file, idx) => (
+                        <div key={idx} className="flex items-center justify-between p-3 rounded-lg border border-[var(--border)] bg-[var(--background-secondary)] text-xs">
+                          <div className="flex items-center gap-2 min-w-0">
+                            <FileText size={14} className="text-[var(--accent)] flex-shrink-0" />
+                            <span className="font-medium text-[var(--foreground)] truncate">{file.name}</span>
+                            <span className="text-[10px] text-[var(--foreground-muted)] font-mono flex-shrink-0">
+                              {(file.size / 1024).toFixed(1)} KB
+                            </span>
+                          </div>
+                          <button
+                            onClick={() => handleRemoveFile(idx)}
+                            className="p-1.5 rounded-md hover:bg-[var(--error-bg)] text-[var(--foreground-muted)] hover:text-[var(--error)] transition-colors cursor-pointer"
+                          >
+                            <Trash2 size={12} />
+                          </button>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
+
+            {/* Advanced Options Toggle */}
+            <div className="px-4 py-2 border-t border-[var(--border)] bg-[var(--background-secondary)]/30">
+              <button
+                onClick={() => setShowAdvanced(!showAdvanced)}
+                className="flex items-center gap-1.5 text-[11px] text-[var(--foreground-muted)] hover:text-[var(--foreground)] transition-colors cursor-pointer"
+              >
+                <ChevronDown size={12} style={{ transform: showAdvanced ? "rotate(180deg)" : "rotate(0)", transition: "transform 200ms" }} />
+                {language === "tr" ? "Gelişmiş Seçenekler" : "Advanced Options"}
+              </button>
+
+              {showAdvanced && (
+                <div className="mt-3 grid grid-cols-2 md:grid-cols-4 gap-3 animate-slide-up">
+                  {outputFormat === "pdf" && (
+                    <div className="space-y-1">
+                      <label className="text-[9px] font-bold uppercase tracking-wider text-[var(--foreground-muted)]">
+                        {language === "tr" ? "PDF Motoru" : "PDF Engine"}
+                      </label>
+                      <select value={engine} onChange={(e) => setEngine(e.target.value)} className="select-field text-xs w-full h-8">
+                        <option value="typst">⚡ Typst (Hızlı)</option>
+                        <option value="xelatex">📐 XeLaTeX</option>
+                        <option value="weasyprint">🌐 WeasyPrint</option>
+                      </select>
+                    </div>
+                  )}
+                  <label className="flex items-center gap-2 text-[11px] text-[var(--foreground-secondary)] cursor-pointer">
+                    <input type="checkbox" checked={toc} onChange={(e) => setToc(e.target.checked)} className="accent-[var(--accent)]" />
+                    {language === "tr" ? "İçindekiler" : "Table of Contents"}
+                  </label>
+                  <label className="flex items-center gap-2 text-[11px] text-[var(--foreground-secondary)] cursor-pointer">
+                    <input type="checkbox" checked={smart} onChange={(e) => setSmart(e.target.checked)} className="accent-[var(--accent)]" />
+                    {language === "tr" ? "Akıllı Tipografi" : "Smart Typography"}
+                  </label>
+                  <label className="flex items-center gap-2 text-[11px] text-[var(--foreground-secondary)] cursor-pointer">
+                    <input type="checkbox" checked={standalone} onChange={(e) => setStandalone(e.target.checked)} className="accent-[var(--accent)]" />
+                    {language === "tr" ? "Bağımsız Dosya" : "Standalone"}
+                  </label>
+                </div>
+              )}
+            </div>
+
+            {/* Convert Button Bar */}
+            <div className="p-4 border-t border-[var(--border)] bg-[var(--background-secondary)]/50">
+              <div className="flex items-center gap-3">
+                <button
+                  onClick={handleConvert}
+                  disabled={conversionState === "converting" || !hasInput}
+                  className="btn-primary flex-1 py-3.5 rounded-xl flex items-center justify-center gap-2.5 cursor-pointer font-bold text-sm disabled:opacity-50 disabled:cursor-not-allowed"
+                  id="convert-button"
+                >
+                  {conversionState === "converting" ? (
                     <>
-                      <Loader2 size={14} className="animate-spin" />
-                      <span>{t("settings_converting")}</span>
+                      <Loader2 size={16} className="animate-spin" />
+                      <span>{language === "tr" ? "Dönüştürülüyor..." : "Converting..."}</span>
                     </>
                   ) : (
                     <>
-                      <Zap size={14} />
-                      <span>{t("onboard_compile_btn")}</span>
+                      <Zap size={16} />
+                      <span>{language === "tr" ? "Dönüştür" : "Convert"}</span>
                     </>
                   )}
                 </button>
-              </div>
-            </div>
-          </div>
 
-          {/* Quick Actions (Presets) */}
-          <div className="space-y-4 animate-slide-up" style={{ animationDelay: "300ms" }}>
-            <h2 className="text-xs uppercase font-bold tracking-wider text-[var(--foreground-muted)] flex items-center gap-1.5">
-              <Zap size={12} className="text-[var(--accent)]" />
-              {t("quick_presets")}
-            </h2>
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
-              <div 
-                onClick={() => router.push("/workspace/new?format=pdf")}
-                className="glass-card p-5 group cursor-pointer flex flex-col"
-              >
-                <div className="w-9 h-9 rounded-xl flex items-center justify-center mb-3 bg-[var(--accent-subtle)] text-[var(--accent)] group-hover:scale-110 transition-transform">
-                  <FileText size={16} />
-                </div>
-                <p className="text-xs font-semibold text-[var(--foreground)] mb-1 group-hover:text-[var(--accent)] transition-colors">
-                  Markdown → PDF
-                </p>
-                <p className="text-[11px] text-[var(--foreground-muted)] leading-normal mt-auto">
-                  {t("quick_pdf_desc")}
-                </p>
-              </div>
-              <div 
-                onClick={() => router.push("/workspace/new?format=docx")}
-                className="glass-card p-5 group cursor-pointer flex flex-col"
-              >
-                <div className="w-9 h-9 rounded-xl flex items-center justify-center mb-3 bg-purple-500/10 text-purple-400 group-hover:scale-110 transition-transform">
-                  <BookOpen size={16} />
-                </div>
-                <p className="text-xs font-semibold text-[var(--foreground)] mb-1 group-hover:text-[var(--accent)] transition-colors">
-                  LaTeX → DOCX
-                </p>
-                <p className="text-[11px] text-[var(--foreground-muted)] leading-normal mt-auto">
-                  {t("quick_docx_desc")}
-                </p>
-              </div>
-              <div 
-                onClick={() => router.push("/workspace/new?format=html")}
-                className="glass-card p-5 group cursor-pointer flex flex-col"
-              >
-                <div className="w-9 h-9 rounded-xl flex items-center justify-center mb-3 bg-cyan-500/10 text-cyan-400 group-hover:scale-110 transition-transform">
-                  <Globe size={16} />
-                </div>
-                <p className="text-xs font-semibold text-[var(--foreground)] mb-1 group-hover:text-[var(--accent)] transition-colors">
-                  DOCX → HTML
-                </p>
-                <p className="text-[11px] text-[var(--foreground-muted)] leading-normal mt-auto">
-                  {t("quick_html_desc")}
-                </p>
-              </div>
-              <div 
-                onClick={() => router.push("/workspace/new?format=revealjs")}
-                className="glass-card p-5 group cursor-pointer flex flex-col"
-              >
-                <div className="w-9 h-9 rounded-xl flex items-center justify-center mb-3 bg-emerald-500/10 text-emerald-400 group-hover:scale-110 transition-transform">
-                  <Code2 size={16} />
-                </div>
-                <p className="text-xs font-semibold text-[var(--foreground)] mb-1 group-hover:text-[var(--accent)] transition-colors">
-                  Markdown → Slayt
-                </p>
-                <p className="text-[11px] text-[var(--foreground-muted)] leading-normal mt-auto">
-                  {t("quick_slide_desc")}
-                </p>
-              </div>
-            </div>
-          </div>
-
-          {/* Recent Document Transactions */}
-          <div className="space-y-4 animate-slide-up" style={{ animationDelay: "400ms" }}>
-            <div className="flex items-center justify-between">
-              <h2 className="text-xs uppercase font-bold tracking-wider text-[var(--foreground-muted)] flex items-center gap-1.5">
-                <Clock size={12} />
-                {t("recent_transactions")}
-              </h2>
-              <button 
-                onClick={() => router.push("/workspace/projects")}
-                className="btn-ghost text-xs py-1.5 px-3 rounded-lg hover:bg-[var(--surface)] text-[var(--foreground-secondary)] flex items-center gap-1 cursor-pointer"
-              >
-                {t("view_all_projects")}
-                <ArrowRight size={12} />
-              </button>
-            </div>
-
-            <div className="border border-[var(--border)] rounded-xl overflow-hidden bg-[var(--background-secondary)]/30 backdrop-blur-sm shadow-md">
-              <div className="divide-y divide-[var(--border)]">
-                {filteredProjects.length === 0 ? (
-                  /* Empty State — Helpful content */
-                  <div className="p-10 text-center space-y-4">
-                    <div className="w-12 h-12 mx-auto rounded-xl bg-[var(--accent-subtle)] text-[var(--accent)] flex items-center justify-center">
-                      <FolderOpen size={24} />
-                    </div>
-                    <div>
-                      <p className="text-sm font-semibold text-[var(--foreground)]">{t("empty_state_title")}</p>
-                      <p className="text-xs text-[var(--foreground-muted)] max-w-sm mx-auto mt-1">{t("empty_state_desc")}</p>
-                    </div>
-                    <button
-                      onClick={() => router.push("/workspace/new")}
-                      className="btn-primary py-2 px-5 text-xs rounded-lg mx-auto"
-                    >
-                      <Plus size={14} />
-                      {t("empty_state_cta")}
-                    </button>
-                  </div>
-                ) : (
-                  filteredProjects.map((project) => (
-                    <Link
-                      key={project.id}
-                      href={`/workspace/${project.id}`}
-                      className="flex flex-col sm:flex-row sm:items-center justify-between p-4 gap-3 hover:bg-[var(--surface-hover)]/50 transition-all group"
-                      style={{ textDecoration: "none" }}
-                    >
-                      <div className="flex items-center gap-3.5 min-w-0">
-                        <div className="w-9 h-9 rounded-lg border border-[var(--border)] bg-[var(--background-tertiary)] flex items-center justify-center flex-shrink-0 text-[var(--foreground-secondary)] group-hover:border-[var(--accent)] group-hover:text-[var(--accent)] transition-all">
-                          <FolderOpen size={15} />
-                        </div>
-                        <div className="min-w-0">
-                          <p className="text-xs font-semibold text-[var(--foreground)] truncate group-hover:text-[var(--accent)] transition-colors mb-0.5">
-                            {language === "tr" ? project.name : project.nameEn}
-                          </p>
-                          <p className="text-[11px] text-[var(--foreground-muted)] truncate max-w-md">
-                            {language === "tr" ? project.description : project.descriptionEn}
-                          </p>
-                        </div>
-                      </div>
-
-                      <div className="flex items-center gap-3 ml-auto sm:ml-0 flex-shrink-0">
-                        <span className="px-2.5 py-1 rounded-md text-[10px] font-mono bg-[var(--background-tertiary)] border border-[var(--border)] text-[var(--foreground-secondary)]">
-                          {project.format}
-                        </span>
-                        
-                        <span className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-md text-[10px] font-semibold ${
-                          project.status === "completed" 
-                            ? "bg-[var(--success-bg)] text-[var(--success)] border border-[var(--success)]/15" 
-                            : "bg-[var(--warning-bg)] text-[var(--warning)] border border-[var(--warning)]/15"
-                        }`}>
-                          {project.status === "completed" ? (
-                            <CheckCircle2 size={10} className="flex-shrink-0" />
-                          ) : (
-                            <Loader2 size={10} className="animate-spin flex-shrink-0" />
-                          )}
-                          {project.status === "completed" ? (language === "tr" ? "Tamamlandı" : "Completed") : (language === "tr" ? "İşleniyor" : "Processing")}
-                        </span>
-
-                        <span className="text-[10px] text-[var(--foreground-muted)]">
-                          {language === "tr" ? project.updatedAt : project.updatedAtEn}
-                        </span>
-
-                        <ArrowRight
-                          size={14}
-                          className="opacity-0 group-hover:opacity-100 group-hover:translate-x-0.5 transition-all text-[var(--foreground-muted)] hidden sm:block"
-                        />
-                      </div>
-                    </Link>
-                  ))
+                {conversionState === "completed" && (
+                  <button
+                    onClick={handleReset}
+                    className="p-3.5 rounded-xl border border-[var(--border)] bg-[var(--background)] hover:bg-[var(--surface-hover)] text-[var(--foreground-muted)] hover:text-[var(--foreground)] transition-colors cursor-pointer"
+                    title={language === "tr" ? "Yeni Dönüşüm" : "New Conversion"}
+                  >
+                    <RotateCcw size={16} />
+                  </button>
                 )}
               </div>
+
+              {/* Progress Bar */}
+              {conversionState === "converting" && (
+                <div className="progress-bar mt-3">
+                  <div className="progress-bar-fill" style={{ width: `${progress}%` }} />
+                </div>
+              )}
+            </div>
+          </div>
+
+          {/* Result Section */}
+          {conversionState === "completed" && outputUrl && (
+            <div className="space-y-4 animate-slide-up">
+              {/* Success Banner + Download */}
+              <div className="glass-card p-5 rounded-2xl border border-[var(--success)]/20 bg-[var(--success-bg)]/50 flex flex-col sm:flex-row items-center justify-between gap-4">
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 rounded-xl bg-[var(--success-bg)] border border-[var(--success)]/20 text-[var(--success)] flex items-center justify-center">
+                    <CheckCircle2 size={20} />
+                  </div>
+                  <div>
+                    <p className="text-sm font-semibold text-[var(--foreground)]">
+                      {language === "tr" ? "Başarıyla Dönüştürüldü!" : "Successfully Converted!"}
+                    </p>
+                    <div className="flex items-center gap-3 text-[10px] text-[var(--foreground-muted)] mt-0.5">
+                      {executionTimeMs && (
+                        <span className="flex items-center gap-1"><Clock size={10} /> {(executionTimeMs / 1000).toFixed(1)}s</span>
+                      )}
+                      <span className="flex items-center gap-1"><FileCode size={10} /> {outputFormat.toUpperCase()}</span>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="flex items-center gap-2">
+                  {canPreview && (
+                    <a
+                      href={outputUrl}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="py-2.5 px-4 rounded-lg border border-[var(--border)] bg-[var(--background)] hover:bg-[var(--surface-hover)] text-xs font-semibold text-[var(--foreground-secondary)] flex items-center gap-1.5 transition-colors"
+                      style={{ textDecoration: "none" }}
+                    >
+                      <Eye size={14} />
+                      {language === "tr" ? "Yeni Sekmede Aç" : "Open in Tab"}
+                    </a>
+                  )}
+                  <a
+                    href={outputUrl}
+                    download={`converted.${OUTPUT_EXT_MAP[outputFormat] || outputFormat}`}
+                    className="btn-primary py-2.5 px-5 rounded-lg text-xs font-bold flex items-center gap-1.5"
+                    style={{ textDecoration: "none" }}
+                    id="download-button"
+                  >
+                    <Download size={14} />
+                    {language === "tr" ? "İndir" : "Download"}
+                  </a>
+                </div>
+              </div>
+
+              {/* Inline Preview (for PDF/HTML) */}
+              {canPreview && (
+                <div className="glass-card rounded-2xl border border-[var(--border)] overflow-hidden">
+                  <div className="p-3 border-b border-[var(--border)] bg-[var(--background-secondary)]/50 flex items-center justify-between">
+                    <div className="flex items-center gap-2">
+                      <Eye size={12} className="text-[var(--foreground-muted)]" />
+                      <span className="text-[10px] font-bold uppercase tracking-widest text-[var(--foreground-muted)]">
+                        {language === "tr" ? "Önizleme" : "Preview"}
+                      </span>
+                    </div>
+                    <div className="flex items-center gap-1.5">
+                      <span className="inline-block w-1.5 h-1.5 rounded-full bg-[var(--success)]" />
+                      <span className="text-[9px] font-bold uppercase tracking-wider text-[var(--foreground-muted)]">
+                        {outputFormat.toUpperCase()}
+                      </span>
+                    </div>
+                  </div>
+                  <iframe
+                    src={outputUrl}
+                    className="w-full border-0 bg-white"
+                    style={{ height: "600px" }}
+                    title="Document Preview"
+                    sandbox="allow-scripts allow-same-origin"
+                    id="preview-iframe"
+                  />
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* Error State */}
+          {conversionState === "failed" && (
+            <div className="glass-card p-6 rounded-2xl border border-[var(--error)]/15 animate-slide-up space-y-4">
+              <div className="flex items-start gap-3">
+                <div className="w-10 h-10 rounded-xl bg-[var(--error-bg)] text-[var(--error)] flex items-center justify-center flex-shrink-0">
+                  <AlertCircle size={20} />
+                </div>
+                <div className="flex-1 min-w-0">
+                  <p className="text-sm font-semibold text-[var(--foreground)]">
+                    {language === "tr" ? "Dönüşüm Hatası" : "Conversion Error"}
+                  </p>
+                  {errorMessage && (
+                    <pre className="mt-2 p-3 rounded-lg bg-[var(--background-tertiary)] border border-[var(--border)] text-[10px] font-mono text-[var(--foreground-secondary)] overflow-auto max-h-[150px] whitespace-pre-wrap">
+                      {errorMessage}
+                    </pre>
+                  )}
+                </div>
+              </div>
+              <button
+                onClick={handleReset}
+                className="btn-primary py-2.5 px-5 text-xs rounded-lg flex items-center gap-2 cursor-pointer"
+              >
+                <RotateCcw size={12} />
+                {language === "tr" ? "Tekrar Dene" : "Try Again"}
+              </button>
+            </div>
+          )}
+
+          {/* How it Works Section */}
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4 animate-slide-up" style={{ animationDelay: "200ms" }}>
+            <div className="glass-card p-5 text-center space-y-3">
+              <div className="w-10 h-10 rounded-xl bg-[var(--accent-subtle)] text-[var(--accent)] flex items-center justify-center mx-auto">
+                <Upload size={18} />
+              </div>
+              <h3 className="text-xs font-bold text-[var(--foreground)]">
+                {language === "tr" ? "1. Yükle veya Yaz" : "1. Upload or Write"}
+              </h3>
+              <p className="text-[11px] text-[var(--foreground-muted)] leading-relaxed">
+                {language === "tr" ? "Markdown, LaTeX, Word veya diğer desteklenen formatları yükleyin." : "Upload Markdown, LaTeX, Word or other supported formats."}
+              </p>
+            </div>
+            <div className="glass-card p-5 text-center space-y-3">
+              <div className="w-10 h-10 rounded-xl bg-purple-500/10 text-purple-400 flex items-center justify-center mx-auto">
+                <Zap size={18} />
+              </div>
+              <h3 className="text-xs font-bold text-[var(--foreground)]">
+                {language === "tr" ? "2. Dönüştür" : "2. Convert"}
+              </h3>
+              <p className="text-[11px] text-[var(--foreground-muted)] leading-relaxed">
+                {language === "tr" ? "Çıktı formatını seçin ve anında dönüştürün." : "Choose output format and convert instantly."}
+              </p>
+            </div>
+            <div className="glass-card p-5 text-center space-y-3">
+              <div className="w-10 h-10 rounded-xl bg-emerald-500/10 text-emerald-400 flex items-center justify-center mx-auto">
+                <Download size={18} />
+              </div>
+              <h3 className="text-xs font-bold text-[var(--foreground)]">
+                {language === "tr" ? "3. İndir" : "3. Download"}
+              </h3>
+              <p className="text-[11px] text-[var(--foreground-muted)] leading-relaxed">
+                {language === "tr" ? "Dosyanızı indirin. 30 dakika sonra otomatik silinir." : "Download your file. Auto-deleted after 30 minutes."}
+              </p>
             </div>
           </div>
         </div>
-
-        {/* Global Footer — Enhanced with KVKK + Privacy */}
-        <footer className="mt-auto py-6 border-t border-[var(--border)] bg-[var(--background-secondary)]/20 backdrop-blur-sm">
-          <div className="max-w-5xl mx-auto px-6 flex flex-col sm:flex-row items-center justify-between gap-4 text-[10px] text-[var(--foreground-muted)]">
-            <div className="flex items-center gap-2">
-              <Shield size={12} className="text-[var(--success)]" />
-              <p>RunDoc · {t("pandoc_orchestrator")} · {t("footer_powered")}</p>
-            </div>
-            <div className="flex items-center gap-4">
-              <Link href="/support" className="hover:text-[var(--foreground)] transition-colors">{t("nav_help")}</Link>
-              <Link href="/api-docs" className="hover:text-[var(--foreground)] transition-colors">{t("nav_api")}</Link>
-              <Link href="/terms" className="hover:text-[var(--foreground)] transition-colors">{t("nav_terms")}</Link>
-              <Link href="/terms#privacy" className="hover:text-[var(--foreground)] transition-colors font-semibold">{t("nav_privacy")}</Link>
-            </div>
-          </div>
-        </footer>
       </main>
+
+      {/* Footer */}
+      <footer className="relative z-10 py-5 border-t border-[var(--border)] bg-[var(--background-secondary)]/20 backdrop-blur-sm">
+        <div className="max-w-4xl mx-auto px-6 flex flex-col sm:flex-row items-center justify-between gap-3 text-[10px] text-[var(--foreground-muted)]">
+          <div className="flex items-center gap-2">
+            <Shield size={12} className="text-[var(--success)]" />
+            <p>RunDoc · {language === "tr" ? "Dosyalarınız sunucuda saklanmaz" : "Your files are never stored"} · Powered by Pandoc</p>
+          </div>
+          <div className="flex items-center gap-4">
+            <Link href="/support" className="hover:text-[var(--foreground)] transition-colors">{language === "tr" ? "Destek" : "Support"}</Link>
+            <Link href="/api-docs" className="hover:text-[var(--foreground)] transition-colors">API</Link>
+            <Link href="/terms" className="hover:text-[var(--foreground)] transition-colors">{language === "tr" ? "Kullanım Koşulları" : "Terms"}</Link>
+            <Link href="/terms#privacy" className="hover:text-[var(--foreground)] transition-colors font-semibold">{language === "tr" ? "Gizlilik" : "Privacy"}</Link>
+          </div>
+        </div>
+      </footer>
     </div>
   );
 }
