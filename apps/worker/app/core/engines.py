@@ -123,6 +123,9 @@ class EngineRouter:
     @classmethod
     def check_engine_availability(cls, engine_name: str) -> bool:
         """Bir motorun sistemde kurulu olup olmadığını kontrol eder."""
+        import os
+        from pathlib import Path
+        
         all_engines = {**cls.PDF_ENGINES, **cls.SLIDE_ENGINES}
         engine = all_engines.get(engine_name)
 
@@ -130,7 +133,27 @@ class EngineRouter:
             return False
 
         binary = engine.binary_name
+        
+        # 1. Standart PATH'te arama
         is_available = shutil.which(binary) is not None
+        
+        # 2. Windows'ta yaygın LaTeX kurulum yollarını kontrol et
+        if not is_available and binary in ("xelatex", "pdflatex", "lualatex", "luatex"):
+            common_paths = [
+                Path("C:\\Program Files\\MiKTeX\\miktex\\bin\\x64"),
+                Path("C:\\Program Files (x86)\\MiKTeX\\miktex\\bin\\x64"),
+                Path("C:\\Program Files\\TeX Live") / "2024\\bin\\win32",
+                Path("C:\\Program Files\\TeX Live") / "2023\\bin\\win32",
+                Path("C:\\Program Files\\TeX Live") / "2022\\bin\\win32",
+                Path(os.path.expandvars("%USERPROFILE%\\scoop\\apps\\miktex\\current\\miktex\\bin\\x64")),
+                Path(os.path.expandvars("%USERPROFILE%\\scoop\\apps\\texlive\\current\\bin\\win32")),
+            ]
+            for path in common_paths:
+                if (path / f"{binary}.exe").exists():
+                    is_available = True
+                    logger.info(f"LaTeX motoru bulundu: {engine_name} ({path / binary})")
+                    break
+        
         engine.is_available = is_available
 
         if not is_available:
@@ -164,12 +187,12 @@ class EngineRouter:
         PDF motoru seçer. Tercih edilen motor yoksa veya kullanılamıyorsa
         yedek motora düşer.
 
-        Yedek sırası: preferred → xelatex → typst → weasyprint → pdflatex → None (HTML fallback)
+        Yedek sırası: preferred → xelatex → pdflatex → lualatex → typst → tectonic → None (HTML fallback)
         
         Returns:
             Engine name veya None (HTML çıkışına fallback yapılmalı)
         """
-        fallback_order = ["xelatex", "typst", "weasyprint", "pdflatex", "lualatex", "tectonic"]
+        fallback_order = ["xelatex", "pdflatex", "lualatex", "tectonic", "typst", "weasyprint"]
 
         if preferred and cls.check_engine_availability(preferred):
             return preferred
@@ -187,7 +210,7 @@ class EngineRouter:
         # PDF motorları bulunamadıysa uyarı ver ama None döndür (HTML fallback'e izin ver)
         logger.warning(
             "Hiçbir PDF motoru bulunamadı. TeX Live, Typst veya WeasyPrint kurulu olmalıdır. "
-            "Fallback: HTML çıkışı kullanılacak."
+            "Fallback: HTML çıkışı kullanılacak. PDF için LaTeX kurmanız gerekir: scoop install texlive"
         )
         return None
 

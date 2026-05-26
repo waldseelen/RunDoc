@@ -216,10 +216,9 @@ python -c "import app; print(app.__file__)"
 ## ✨ WHAT'S NEXT
 
 1. **Local PDF Support**: Install TeX Live or use Docker
-2. **Frontend**: Build Next.js UI
-3. **Firebase**: Configure storage integration
-4. **Deployment**: Deploy Docker container
-5. **Testing**: Full E2E test suite
+2. **Frontend**: Connect Next.js UI with the FastAPI backend
+3. **Deployment**: Deploy Docker container to Render and Next.js to Vercel
+4. **Testing**: Full E2E test suite locally
 
 ---
 

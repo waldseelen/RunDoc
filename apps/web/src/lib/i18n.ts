@@ -35,7 +35,7 @@ export const TRANSLATIONS = {
 
     // Dashboard Onboarding
     welcome_title: "Hoş Geldiniz",
-    welcome_desc: "Firebase veya yerel derleme altyapısıyla 40'tan fazla dosya formatı arasında akıcı, güvenli çapraz dönüşümler gerçekleştirin, Lua filtrelerinizi yönetin.",
+    welcome_desc: "Yüksek hızlı yerel derleme altyapısıyla 40'tan fazla dosya formatı arasında akıcı, güvenli çapraz dönüşümler gerçekleştirin, Lua filtrelerinizi yönetin.",
     stats_total_conversions: "Toplam Dönüşüm",
     stats_formats: "Desteklenen Format",
     stats_active_projects: "Aktif Proje",
@@ -160,7 +160,7 @@ export const TRANSLATIONS = {
 
     // Dashboard Onboarding
     welcome_title: "Welcome Back",
-    welcome_desc: "Execute smooth, secure cross-conversions between over 40 file formats, manage Lua filters, and compile documents using Firebase or local worker sandbox engines.",
+    welcome_desc: "Execute smooth, secure cross-conversions between over 40 file formats, manage Lua filters, and compile documents using our high-performance local worker sandbox engines.",
     stats_total_conversions: "Total Conversions",
     stats_formats: "Supported Formats",
     stats_active_projects: "Active Projects",

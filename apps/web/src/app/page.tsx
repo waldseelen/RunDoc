@@ -32,7 +32,7 @@ import {
 } from "lucide-react";
 import { useAppSettings } from "@/hooks/useAppSettings";
 import BrandLogo from "@/components/brand-logo";
-import { useStartConversion, getWorkerAuthToken } from "@/hooks/useConversion";
+import { getWorkerAuthToken } from "@/hooks/useConversion";
 
 // =============================================
 // Static Demo Projects

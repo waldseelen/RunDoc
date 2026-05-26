@@ -3,10 +3,11 @@ Pandoc Orchestrator — Dynamic CLI Command Builder
 Builder Pattern ile güvenli Pandoc komut zincirleri oluşturur.
 """
 
+import os
+import re
 import subprocess
 import logging
-from typing import List, Optional, Dict, Any
-from pathlib import Path
+from typing import List, Optional, Dict, Any, Mapping
 
 from app.config import settings
 
@@ -61,6 +62,9 @@ class PandocCommandBuilder:
         "ipynb", "fb2", "man", "typst", "djot", "bibtex"
     }
 
+    VALID_MATH_RENDERING = {"mathjax", "katex", "mathml", "gladtex", "webtex"}
+    CLI_TOKEN_RE = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._-]{0,63}$")
+
     def __init__(self, input_path: str, output_path: str):
         self.input_path = input_path
         self.output_path = output_path
@@ -68,6 +72,110 @@ class PandocCommandBuilder:
         self._input_files: List[str] = [input_path]
         self._options: List[str] = []
         self._output_set = False
+
+    @staticmethod
+    def _normalize_text(value: Any) -> str:
+        text = "" if value is None else str(value)
+        for ch in ("\u200b", "\u200c", "\u200d", "\ufeff"):
+            text = text.replace(ch, "")
+        return text.strip()
+
+    @classmethod
+    def _normalize_token(cls, value: Any) -> Optional[str]:
+        token = cls._normalize_text(value).lower()
+        if not token:
+            return None
+        if not cls.CLI_TOKEN_RE.fullmatch(token):
+            return None
+        return token
+
+    @classmethod
+    def from_plan(cls, plan: Any, input_path: str, output_path: str) -> "PandocCommandBuilder":
+        """
+        ConversionPlan benzeri bir nesneden builder üretir.
+        Bu method, komut inşa detaylarını orchestration katmanından izole eder.
+        """
+        builder = cls(input_path, output_path)
+
+        input_format = getattr(plan, "input_format", None)
+        output_format = getattr(plan, "output_format", None)
+        engine = getattr(plan, "engine", None)
+
+        if input_format:
+            builder.set_input_format(input_format)
+
+        # PDF çıktıda Pandoc'ta --to varsayılan olarak pdf davranışıyla ilerler.
+        if output_format and output_format != "pdf":
+            builder.set_output_format(output_format)
+
+        if engine:
+            builder.add_engine(engine)
+
+        if getattr(plan, "standalone", False):
+            builder.set_standalone()
+
+        if getattr(plan, "smart", False):
+            builder.enable_smart_typography()
+
+        if getattr(plan, "toc", False):
+            builder.add_toc(getattr(plan, "toc_depth", 3))
+
+        if getattr(plan, "number_sections", False):
+            builder.set_number_sections()
+
+        if getattr(plan, "citeproc", False):
+            builder.enable_citeproc()
+
+        bibliography = getattr(plan, "bibliography", None)
+        if bibliography:
+            builder.add_bibliography(bibliography)
+
+        csl_style = getattr(plan, "csl_style", None)
+        if csl_style:
+            builder.add_csl_style(csl_style)
+
+        reference_doc = getattr(plan, "reference_doc", None)
+        if reference_doc:
+            builder.add_reference_doc(reference_doc)
+
+        template = getattr(plan, "template", None)
+        if template:
+            builder.add_template(template)
+
+        highlight_style = getattr(plan, "highlight_style", None)
+        if highlight_style:
+            builder.set_highlight_style(highlight_style)
+
+        math_rendering = getattr(plan, "math_rendering", None)
+        if math_rendering:
+            builder.set_math_rendering(math_rendering)
+
+        variables = getattr(plan, "variables", None)
+        if isinstance(variables, Mapping) and variables:
+            builder.set_variables(dict(variables))
+
+        metadata = getattr(plan, "metadata", None)
+        if isinstance(metadata, Mapping):
+            for key, value in metadata.items():
+                builder.set_metadata(str(key), str(value))
+
+        if getattr(plan, "extract_media", False):
+            workdir = os.path.dirname(os.path.abspath(output_path))
+            media_dir = os.path.join(workdir, "extracted_media")
+            os.makedirs(media_dir, exist_ok=True)
+            builder.extract_media(media_dir)
+
+        filters = getattr(plan, "filters", []) or []
+        for filter_path in filters:
+            if not isinstance(filter_path, str):
+                continue
+            lower = filter_path.lower()
+            if lower.endswith(".lua"):
+                builder.add_lua_filter(filter_path)
+            elif lower.endswith(".py"):
+                builder.add_python_filter(filter_path)
+
+        return builder
 
     def set_input_format(self, fmt: str) -> "PandocCommandBuilder":
         """Girdi formatını belirtir (--from)."""
@@ -153,19 +261,30 @@ class PandocCommandBuilder:
         return self
 
     def set_variable(self, key: str, value: str) -> "PandocCommandBuilder":
-        """Tek bir değişken ayarlar (-V key=value)."""
-        self._options.append(f"-V {key}:{value}")
+        """Tek bir değişken ayarlar (-V key:value)."""
+        clean_key = self._normalize_text(key)
+        clean_value = self._normalize_text(value)
+        if clean_key:
+            self._options.extend(["-V", f"{clean_key}:{clean_value}"])
         return self
 
     def set_variables(self, variables: Dict[str, str]) -> "PandocCommandBuilder":
         """Birden fazla değişken ayarlar."""
+        if not isinstance(variables, Mapping):
+            raise TypeError("variables bir sözlük (dict) olmalıdır")
+
         for key, value in variables.items():
-            self._options.append(f"-V {key}:{value}")
+            if not isinstance(key, str) or not isinstance(value, str):
+                raise TypeError("variables anahtar/değer çiftleri string olmalıdır")
+            self.set_variable(key, value)
         return self
 
     def set_metadata(self, key: str, value: str) -> "PandocCommandBuilder":
         """Metadata değeri ayarlar (-M key=value)."""
-        self._options.append(f"-M {key}={value}")
+        clean_key = self._normalize_text(key)
+        clean_value = self._normalize_text(value)
+        if clean_key:
+            self._options.extend(["-M", f"{clean_key}={clean_value}"])
         return self
 
     def extract_media(self, media_dir: str) -> "PandocCommandBuilder":
@@ -180,14 +299,26 @@ class PandocCommandBuilder:
 
     def set_highlight_style(self, style: str = "pygments") -> "PandocCommandBuilder":
         """Kod renklendirme stilini belirtir."""
-        self._options.append(f"--highlight-style={style}")
+        normalized = self._normalize_token(style)
+        if not normalized:
+            logger.warning(f"Geçersiz highlight_style değeri atlandı: {style!r}")
+            return self
+
+        self._options.append(f"--highlight-style={normalized}")
         return self
 
     def set_math_rendering(self, method: str = "mathjax") -> "PandocCommandBuilder":
         """Matematik işleme yöntemini belirtir."""
-        valid_methods = {"mathjax", "katex", "mathml", "gladtex", "webtex"}
-        if method in valid_methods:
-            self._options.append(f"--{method}")
+        normalized = self._normalize_token(method)
+        if not normalized:
+            logger.warning(f"Geçersiz math_rendering değeri atlandı: {method!r}")
+            return self
+
+        if normalized in self.VALID_MATH_RENDERING:
+            self._options.append(f"--{normalized}")
+        else:
+            logger.warning(f"Desteklenmeyen math_rendering yöntemi atlandı: {method!r}")
+
         return self
 
     def set_number_sections(self) -> "PandocCommandBuilder":
@@ -209,33 +340,33 @@ class PandocCommandBuilder:
         """Tam komutu döndürür (çalıştırmadan)."""
         cmd = list(self._cmd)
         cmd.extend(self._input_files)
-        
+
         # Pandoc 3.x+ smart typography (--smart kaldırıldı, +smart uzantısı kullanılmalı)
-        options = []
+        options: List[str] = []
         has_smart = False
         from_format = None
-        
+
         for opt in self._options:
             if opt == "--smart":
                 has_smart = True
-            elif opt.startswith("--from="):
+            elif isinstance(opt, str) and opt.startswith("--from="):
                 from_format = opt.split("=", 1)[1]  # Correctly extract format
                 options.append(opt)
             else:
                 options.append(opt)
-                
+
         # Smart typography işleme (Pandoc 3.x+ uyumluluğu)
         if has_smart:
             if from_format and not from_format.endswith("+smart"):
                 # Mevcut from format'ına +smart ekle
                 for i, opt in enumerate(options):
-                    if opt.startswith("--from="):
+                    if isinstance(opt, str) and opt.startswith("--from="):
                         options[i] = f"--from={from_format}+smart"
                         break
             elif not from_format:
                 # --from belirtilmemişse varsayılan markdown+smart ekle
                 options.append("--from=markdown+smart")
-                
+
         cmd.extend(options)
         cmd.extend(["-o", self.output_path])
         return cmd

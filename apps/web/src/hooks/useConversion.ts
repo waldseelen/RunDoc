@@ -1,7 +1,7 @@
 "use client";
 
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { WORKER_API_URL } from "@/lib/firebase";
+import { WORKER_API_URL } from "@/lib/config";
 
 // =============================================
 // Types
@@ -164,41 +164,7 @@ export function useFormats() {
   });
 }
 
-/**
- * Dönüşüm başlatır
- */
-export function useStartConversion() {
-  const queryClient = useQueryClient();
 
-  return useMutation({
-    mutationFn: (request: ConversionRequest) =>
-      fetchJSON<ConversionResponse>(`${WORKER_API_URL}/api/v1/convert`, {
-        method: "POST",
-        body: JSON.stringify(request),
-      }),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["conversion-status"] });
-    },
-  });
-}
-
-/**
- * Dönüşüm durumunu takip eder (polling)
- */
-export function useConversionStatus(jobId: string | null) {
-  return useQuery({
-    queryKey: ["conversion-status", jobId],
-    queryFn: () => fetchJSON<ConversionStatus>(`${WORKER_API_URL}/api/v1/status/${jobId}`),
-    enabled: !!jobId,
-    refetchInterval: (query) => {
-      const data = query.state.data as ConversionStatus | undefined;
-      if (!data) return 2000;
-      // İş tamamlandıysa veya hata aldıysa polling'i durdur
-      if (data.status === "completed" || data.status === "failed") return false;
-      return 2000; // Aktifken her 2 saniyede bir kontrol et
-    },
-  });
-}
 
 /**
  * Doküman analizi

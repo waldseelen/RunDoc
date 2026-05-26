@@ -19,34 +19,7 @@ def test_health_endpoint_returns_runtime_flags():
     assert response.status_code == 200
     payload = response.json()
     assert "pandoc_available" in payload
-    assert "firebase_available" in payload
     assert payload["auth_required"] is False
-
-
-def test_status_requires_auth_when_enabled():
-    _set_auth(True, token="test-token")
-
-    response = client.get("/status/fake-job-id")
-
-    assert response.status_code == 401
-
-
-def test_convert_validation_rejects_invalid_toc_depth():
-    _set_auth(False)
-
-    response = client.post(
-        "/convert",
-        json={
-            "project_id": "proj-1",
-            "user_id": "user-1",
-            "input_document_id": "doc-1",
-            "output_format": "pdf",
-            "toc": True,
-            "toc_depth": 99,
-        },
-    )
-
-    assert response.status_code == 422
 
 
 def test_convert_direct_accepts_shared_token_auth():

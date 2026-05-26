@@ -10,7 +10,7 @@ Transform documents dynamically across formats with advanced filter pipelines, b
 
 - **Multi-Format Conversion**: Seamlessly convert between 30+ document formats including Markdown, Jupyter Notebooks, DOCX, LaTeX, HTML5, EPUB, Typst, RTF, and others.
 - **Advanced PDF & Slide Engines**: High-fidelity PDF compiling using XeLaTeX, LuaLaTeX, pdfLaTeX, Tectonic, Typst (highly modern & fast), and HTML-to-PDF (WeasyPrint). Native presentations with RevealJS, PowerPoint (PPTX), and Beamer.
-- **Zero-Config Local Sandbox Mode**: Start coding and testing instantly! If Firebase Storage/Auth credentials are not present locally, the system automatically falls back to an isolated in-memory Mock Storage, a local disk-based compiled static file server (`/outputs/*`), and a bypass authentication layer (`sandbox-user`), eliminating all 503 and 401 errors.
+- **Privacy-First Local Sandbox Mode**: Start coding, compiling, and testing instantly! The system operates 100% locally with zero cloud dependencies, utilizing an isolated in-memory logger, a local disk-based compiled static file server (`/outputs/*`), and a guest access model, eliminating all latency, cloud billing errors, and auth failures.
 - **Academic Publishing Tools**: Deep citation processing via `citeproc`, supporting BibTeX (`.bib`) and CSL JSON bibliographies with built-in styles (APA, MLA, Harvard, IEEE, Chicago).
 - **Mathematics Rendering**: Advanced math compilers support KaTeX, MathJax, MathML, and WebTeX rendering across HTML and PDF outputs.
 - **Robust CLI Builder & Validator**: Executed under a secure list-based subprocess wrapper to prevent shell command injection. Validates that the system has at least `100MB` of free disk space before initiating any compilation to prevent disk-exhaustion crashes.
@@ -26,7 +26,7 @@ Transform documents dynamically across formats with advanced filter pipelines, b
                        │    Next.js 16 Web Frontend (Turbopack)   │
                        │  - Live Monaco Editor & Visual Preview   │
                        │  - Progressive Simulation Progress Bar   │
-                       │  - Automatic /api/v1/ Header Injection   │
+                       │  - Direct /api/v1/ Endpoint Routing      │
                        └──────────────────┬───────────────────────┘
                                           │
                                           │ HTTP API POST / GET
@@ -38,15 +38,13 @@ Transform documents dynamically across formats with advanced filter pipelines, b
                        │  - Engine Router & AST CLI Builders      │
                        └──────────────────┬───────────────────────┘
                                           │
-                  ┌───────────────────────┴───────────────────────┐
-                  ▼                                               ▼
-   [ PRODUCTION MODE ]                                   [ LOCAL SANDBOX MODE ]
-┌───────────────────────────────────────┐             ┌───────────────────────────────────────┐
-│           Firebase Services           │             │      Zero-Config Local Fallbacks      │
-│  - Firestore Logs & Status Tracker    │             │  - In-Memory SQLite Mock Database     │
-│  - Cloud Storage Bucket File Syncs    │             │  - Disk Static File Serving (/outputs)│
-│  - Firebase Web Auth SDK Validation   │             │  - Automatic sandbox-user Context     │
-└───────────────────────────────────────┘             └───────────────────────────────────────┘
+                                          ▼
+                       ┌──────────────────────────────────────────┐
+                       │      Isolated Local Sandbox Compiler     │
+                       │  - In-Memory SQLite Mock Logging         │
+                       │  - Ephemeral Disk File Server (/outputs) │
+                       │  - Automatic 30-Min Temporary Cleanup    │
+                       └──────────────────────────────────────────┘
 ```
 
 ---
@@ -66,9 +64,10 @@ pandoc-orchestrator/
 │   │   │   │   ├── editor.tsx       # Monaco Editor Component Wrapper
 │   │   │   │   └── conversion-panel.tsx # Compilation Options Configuration
 │   │   │   ├── hooks/
-│   │   │   │   └── useConversion.ts # React Query integration and polling
+│   │   │   │   └── useConversion.ts # React Query integration
 │   │   │   └── lib/
-│   │   │       └── firebase.ts      # Cloud infrastructure connection
+│   │   │       ├── config.ts        # Clean API Configuration
+│   │   │       └── i18n.ts          # Localization translations
 │   │   ├── .env.local               # Web Environment Configuration
 │   │   └── package.json
 │   │
@@ -80,8 +79,6 @@ pandoc-orchestrator/
 │       │   │   ├── pandoc_cmd.py    # List-based CLI Subprocess Executor
 │       │   │   ├── engines.py       # XeLaTeX/Typst/WeasyPrint Router
 │       │   │   └── parser.py        # Document Parser & AST Analyzer
-│       │   └── services/
-│       │       └── firebase_service.py # Firebase Connector with Local Fallbacks
 │       ├── .env                     # Worker Environment Configuration
 │       ├── requirements.txt         # Python Package Dependencies
 │       └── tests/                   # Pytest Suites (40+ passing integration tests)
@@ -95,9 +92,8 @@ pandoc-orchestrator/
 │   ├── company_profile.docx         # Reference Document Styling File
 │   └── references.bib               # BibTeX bibliography list
 │
-├── FIREBASE_SETUP.md                # Cloud Database Setup & Rules Guide
 ├── ARCHITECTURE.md                  # Detailed Technical Architecture Specifications
-└── package.json                     # Root Workspace Monorepo Configuration
+├── package.json                     # Root Workspace Monorepo Configuration
 ```
 
 ---
@@ -191,8 +187,7 @@ All requests must route through `/api/v1` or the root `/` paths. In sandbox deve
   {
     "status": "healthy",
     "pandoc_available": true,
-    "firebase_available": false,
-    "auth_required": true,
+    "auth_required": false,
     "version": "0.1.0"
   }
   ```

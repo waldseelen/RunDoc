@@ -35,14 +35,6 @@ def _get_list_env(name: str, default: List[str]) -> List[str]:
 class Settings:
     """Application settings loaded from environment variables."""
 
-    # Firebase
-    firebase_service_account_path: str = field(
-        default_factory=lambda: os.getenv("FIREBASE_SERVICE_ACCOUNT_PATH", "./firebase-service-account.json")
-    )
-    firebase_storage_bucket: str = field(
-        default_factory=lambda: os.getenv("FIREBASE_STORAGE_BUCKET", "")
-    )
-
     # Worker
     worker_api_url: str = field(
         default_factory=lambda: os.getenv("WORKER_API_URL", "http://localhost:8000")
@@ -59,7 +51,7 @@ class Settings:
 
     # Security
     worker_require_auth: bool = field(
-        default_factory=lambda: _get_bool_env("WORKER_REQUIRE_AUTH", True)
+        default_factory=lambda: _get_bool_env("WORKER_REQUIRE_AUTH", False)
     )
     worker_api_token: str = field(
         default_factory=lambda: os.getenv("WORKER_API_TOKEN", "")

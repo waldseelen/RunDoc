@@ -21,7 +21,6 @@ from app.config import settings
 from app.core.pandoc_cmd import PandocCommandBuilder
 from app.core.engines import EngineRouter
 from app.core.parser import DocumentParser
-from app.services.firebase_service import FirebaseService
 
 # =============================================
 # LOGGING & TRACING
@@ -195,12 +194,6 @@ def verify_free_disk_space(required_mb: int = 100):
 os.makedirs(settings.worker_temp_dir, exist_ok=True)
 app.mount("/outputs", StaticFiles(directory=settings.worker_temp_dir), name="outputs")
 
-# Supabase servisi (artık Firebase servisi)
-firebase_service = FirebaseService(
-    service_account_path=settings.firebase_service_account_path,
-    storage_bucket=settings.firebase_storage_bucket
-)
-
 
 def _extract_bearer_token(authorization: Optional[str]) -> Optional[str]:
     if not authorization:
@@ -213,7 +206,7 @@ def _extract_bearer_token(authorization: Optional[str]) -> Optional[str]:
 
 
 async def verify_access_token(authorization: Optional[str] = Header(default=None)) -> Dict[str, Any]:
-    """API endpointleri için JWT/API token doğrulaması."""
+    """API endpointleri için token doğrulaması (Firebase-free Sandbox)."""
     if not settings.worker_require_auth:
         return {"uid": "anonymous", "provider": "disabled"}
 
@@ -224,121 +217,13 @@ async def verify_access_token(authorization: Optional[str] = Header(default=None
     if settings.worker_api_token and token == settings.worker_api_token:
         return {"uid": "worker-api-token", "provider": "shared-secret"}
 
-    # Sandbox Modu Kontrolü: Firebase service account yoksa, herhangi bir tokenı Sandbox kullanıcısı olarak kabul et
-    has_firebase_creds = settings.firebase_service_account_path and os.path.exists(settings.firebase_service_account_path)
-
-    try:
-        import firebase_admin
-        from firebase_admin import auth as firebase_auth
-
-        firebase_service._initialize()
-        if not firebase_admin._apps or not has_firebase_creds:
-            logger.warning("Firebase service account eksik veya başlatılamadı. İstek Sandbox Modu kapsamında otomatik kabul edildi.")
-            return {"uid": "sandbox-user", "provider": "sandbox"}
-
-        decoded = firebase_auth.verify_id_token(token)
-        uid = decoded.get("uid")
-        if not uid:
-            raise HTTPException(status_code=401, detail="Geçersiz token")
-
-        return {"uid": uid, "provider": "firebase", "claims": decoded}
-    except HTTPException:
-        raise
-    except Exception as e:
-        # Token doğrulaması başarısız olsa bile, Firebase service account bulunmuyorsa Sandbox Modunda devam et
-        if not has_firebase_creds:
-            logger.warning(f"Token doğrulaması başarısız oldu fakat Sandbox Modu kapsamında bypass ediliyor. Hata: {e}")
-            return {"uid": "sandbox-user", "provider": "sandbox"}
-        raise HTTPException(status_code=401, detail="Token doğrulaması başarısız")
+    # Firebase kaldırıldığı için tüm geçerli Bearer token'ları Sandbox kullanıcısı olarak kabul et
+    return {"uid": "sandbox-user", "provider": "sandbox"}
 
 
 # =============================================
 # PYDANTIC MODELS
 # =============================================
-
-class ConversionRequest(BaseModel):
-    """Dönüşüm isteği modeli."""
-    project_id: str = Field(min_length=1, max_length=128)
-    user_id: str = Field(min_length=1, max_length=128)
-    input_document_id: str = Field(min_length=1, max_length=128)
-    input_format: Optional[str] = Field(default=None, max_length=64)  # None ise otomatik algılanır
-    output_format: OutputFormat = OutputFormat.PDF
-    engine: Optional[str] = Field(default=None, max_length=64)  # None ise otomatik seçilir
-
-    # Opsiyonel parametreler
-    citeproc: bool = False
-    bibliography_id: Optional[str] = Field(default=None, max_length=128)
-    csl_style: Optional[str] = Field(default=None, max_length=128)  # "apa", "mla", "harvard", "ieee" veya özel dosya ID
-    reference_doc_id: Optional[str] = Field(default=None, max_length=128)
-    template_id: Optional[str] = Field(default=None, max_length=128)
-
-    # Filtreler
-    lua_filter_ids: List[str] = Field(default_factory=list, max_length=10)
-    python_filter_ids: List[str] = Field(default_factory=list, max_length=10)
-
-    # Seçenekler
-    toc: bool = False
-    toc_depth: int = Field(default=3, ge=1, le=6)
-    smart: bool = True
-    number_sections: bool = False
-    standalone: bool = True
-    highlight_style: str = Field(default="pygments", max_length=64)
-    math_rendering: str = Field(default="mathjax", max_length=16)  # mathjax, katex, mathml
-
-    # Medya ayıklama
-    extract_media: bool = False
-
-    # Ekstra değişkenler
-    variables: Dict[str, str] = Field(default_factory=dict)
-    metadata: Dict[str, str] = Field(default_factory=dict)
-
-    # Birleştirme için ek dosyalar
-    additional_input_ids: List[str] = Field(default_factory=list, max_length=20)
-
-    @field_validator("lua_filter_ids", "python_filter_ids", "additional_input_ids")
-    @classmethod
-    def validate_id_list(cls, value: List[str]) -> List[str]:
-        if len(value) != len(set(value)):
-            raise ValueError("Tekrarlanan ID değerleri gönderilemez")
-        for item in value:
-            if len(item) > 128:
-                raise ValueError("ID değerleri 128 karakterden kısa olmalı")
-        return value
-
-    @field_validator("math_rendering")
-    @classmethod
-    def validate_math_rendering(cls, value: str) -> str:
-        normalized = value.lower().strip()
-        if normalized not in VALID_MATH_RENDERING:
-            raise ValueError(f"Geçersiz math_rendering değeri: {value}")
-        return normalized
-
-    @field_validator("variables", "metadata")
-    @classmethod
-    def validate_key_value_maps(cls, value: Dict[str, str]) -> Dict[str, str]:
-        if len(value) > 50:
-            raise ValueError("En fazla 50 anahtar-değer çifti gönderilebilir")
-
-        sanitized: Dict[str, str] = {}
-        for key, raw in value.items():
-            key = str(key).strip()
-            if not _SAFE_KEY_PATTERN.match(key):
-                raise ValueError(f"Geçersiz anahtar adı: {key}")
-
-            value_str = str(raw)
-            if len(value_str) > 1000:
-                raise ValueError(f"'{key}' değeri 1000 karakteri geçemez")
-
-            sanitized[key] = value_str
-
-        return sanitized
-
-
-class ConversionResponse(BaseModel):
-    """Dönüşüm yanıt modeli."""
-    job_id: str
-    status: str
-    message: str
 
 
 class ConversionStatus(BaseModel):
@@ -362,248 +247,23 @@ class AnalysisResponse(BaseModel):
     suggested_options: dict = Field(default_factory=dict)
 
 
-# =============================================
-# BACKGROUND TASK: Dönüşüm İşlemi
-# =============================================
-
-def run_conversion(request: ConversionRequest, job_id: str, workdir: str):
-    """
-    Arka planda çalışan dönüşüm işlemi.
-    İş akışı: İndir → Analiz → Komut Oluştur → Çalıştır → Yükle → Güncelle
-    """
-    try:
-        # 1. Durumu "processing" olarak güncelle
-        firebase_service.update_conversion_status(job_id, "processing")
-
-        # 2. Girdi dosyasını indir
-        input_doc = firebase_service.get_project_documents(request.project_id)
-        input_doc_info = next(
-            (d for d in input_doc if d["id"] == request.input_document_id), None
-        )
-
-        if not input_doc_info:
-            raise ValueError(f"Girdi dokümanı bulunamadı: {request.input_document_id}")
-
-        input_filename = input_doc_info["file_name"]
-        input_local = os.path.join(workdir, input_filename)
-
-        bucket = input_doc_info.get("file_type", "source")
-        storage_path = input_doc_info["storage_path"]
-
-        firebase_service.download_file(bucket, storage_path, input_local)
-
-        # 3. Format algılama
-        input_format = request.input_format or DocumentParser.detect_format(input_local)
-        if not input_format:
-            raise ValueError(f"Girdi formatı algılanamadı: {input_filename}")
-
-        # 4. Çıktı dosya adını belirle
-        output_format = request.output_format.value if isinstance(request.output_format, OutputFormat) else str(request.output_format)
-        output_ext = OUTPUT_EXT_MAP.get(output_format, ".out")
-        output_filename = f"{Path(input_filename).stem}_output{output_ext}"
-        output_local = os.path.join(workdir, output_filename)
-
-        # 5. Motor seçimi
-        engine = None
-        if output_format == "pdf":
-            engine = EngineRouter.select_pdf_engine(request.engine)
-            if engine is None:
-                logger.warning("PDF motoru bulunamadı, HTML fallback uygulanıyor")
-                output_format = "html"
-                output_ext = OUTPUT_EXT_MAP.get(output_format, ".out")
-                output_filename = f"{Path(input_filename).stem}_output{output_ext}"
-                output_local = os.path.join(workdir, output_filename)
-        elif output_format in ("revealjs", "beamer", "slidy", "pptx"):
-            engine = EngineRouter.select_slide_engine(request.engine)
-
-        # 6. Pandoc komutunu oluştur
-        builder = PandocCommandBuilder(input_local, output_local)
-
-        if input_format:
-            builder.set_input_format(input_format)
-
-        if output_format != "pdf":
-            builder.set_output_format(output_format)
-
-        if engine:
-            builder.add_engine(engine)
-
-        if request.standalone:
-            builder.set_standalone()
-
-        if request.smart:
-            builder.enable_smart_typography()
-
-        if request.toc:
-            builder.add_toc(request.toc_depth)
-
-        if request.number_sections:
-            builder.set_number_sections()
-
-        if request.citeproc:
-            builder.enable_citeproc()
-
-        if request.highlight_style:
-            builder.set_highlight_style(request.highlight_style)
-
-        if request.math_rendering:
-            builder.set_math_rendering(request.math_rendering)
-
-        if request.variables:
-            builder.set_variables(request.variables)
-
-        for key, value in request.metadata.items():
-            builder.set_metadata(key, value)
-
-        # Kaynakça dosyası indir ve ekle
-        if request.bibliography_id:
-            bib_docs = firebase_service.get_project_documents(
-                request.project_id, "bibliography"
-            )
-            bib_doc = next((d for d in bib_docs if d["id"] == request.bibliography_id), None)
-            if bib_doc:
-                bib_local = os.path.join(workdir, bib_doc["file_name"])
-                firebase_service.download_file("bibliography", bib_doc["storage_path"], bib_local)
-                builder.add_bibliography(bib_local)
-
-        # CSL stili
-        builtin_csl = {
-            "apa": "apa.csl", "mla": "modern-language-association.csl",
-            "harvard": "harvard-cite-them-right.csl", "ieee": "ieee.csl",
-            "chicago": "chicago-author-date.csl"
-        }
-        if request.csl_style:
-            if request.csl_style in builtin_csl:
-                builder.add_csl_style(builtin_csl[request.csl_style])
-            else:
-                # Özel CSL dosyası
-                csl_local = os.path.join(workdir, f"{request.csl_style}.csl")
-                firebase_service.download_file("bibliography", request.csl_style, csl_local)
-                builder.add_csl_style(csl_local)
-
-        # Referans doküman
-        if request.reference_doc_id:
-            ref_docs = firebase_service.get_project_documents(
-                request.project_id, "reference"
-            )
-            ref_doc = next((d for d in ref_docs if d["id"] == request.reference_doc_id), None)
-            if ref_doc:
-                ref_local = os.path.join(workdir, ref_doc["file_name"])
-                firebase_service.download_file("reference", ref_doc["storage_path"], ref_local)
-                builder.add_reference_doc(ref_local)
-
-        # Lua filtreleri
-        filters_applied = []
-        for filter_id in request.lua_filter_ids:
-            filter_docs = firebase_service.get_project_documents(
-                request.project_id, "filter"
-            )
-            filter_doc = next((d for d in filter_docs if d["id"] == filter_id), None)
-            if filter_doc:
-                filter_local = os.path.join(workdir, filter_doc["file_name"])
-                firebase_service.download_file("filters", filter_doc["storage_path"], filter_local)
-                builder.add_lua_filter(filter_local)
-                filters_applied.append(filter_doc["file_name"])
-
-        # Python filtreleri
-        for filter_id in request.python_filter_ids:
-            filter_docs = firebase_service.get_project_documents(
-                request.project_id, "filter"
-            )
-            filter_doc = next((d for d in filter_docs if d["id"] == filter_id), None)
-            if filter_doc:
-                filter_local = os.path.join(workdir, filter_doc["file_name"])
-                firebase_service.download_file("filters", filter_doc["storage_path"], filter_local)
-                builder.add_python_filter(filter_local)
-                filters_applied.append(filter_doc["file_name"])
-
-        # Medya ayıklama
-        if request.extract_media:
-            media_dir = os.path.join(workdir, "extracted_media")
-            builder.extract_media(media_dir)
-
-        # Ek girdi dosyaları (birleştirme)
-        for additional_id in request.additional_input_ids:
-            add_docs = firebase_service.get_project_documents(request.project_id)
-            add_doc = next((d for d in add_docs if d["id"] == additional_id), None)
-            if add_doc:
-                add_local = os.path.join(workdir, f"add_{add_doc['file_name']}")
-                firebase_service.download_file(
-                    add_doc.get("file_type", "source"), add_doc["storage_path"], add_local
-                )
-                builder.add_extra_input(add_local)
-
-        # 7. Komutu çalıştır
-        result = builder.execute()
-
-        # 8. Sonuçları işle
-        if result["status"] == "success" and os.path.exists(output_local):
-            # Çıktıyı Storage'a yükle
-            output_storage_path = f"{request.project_id}/{job_id}/{output_filename}"
-            firebase_service.upload_file("output", output_storage_path, output_local)
-
-            # Doküman kaydı
-            output_doc_id = firebase_service.register_document(
-                project_id=request.project_id,
-                file_name=output_filename,
-                storage_path=output_storage_path,
-                file_type="output",
-                file_size_bytes=os.path.getsize(output_local)
-            )
-
-            # Başarılı durum güncelle
-            firebase_service.update_conversion_status(
-                log_id=job_id,
-                status="completed",
-                command_executed=result.get("cmd"),
-                execution_time_ms=result.get("execution_time_ms"),
-                output_document_id=output_doc_id,
-                filters_applied=filters_applied if filters_applied else None
-            )
-
-            logger.info(f"Dönüşüm tamamlandı: {job_id}")
-
-        else:
-            firebase_service.update_conversion_status(
-                log_id=job_id,
-                status="failed",
-                command_executed=result.get("cmd"),
-                error_message=result.get("stderr", "Bilinmeyen hata"),
-                execution_time_ms=result.get("execution_time_ms"),
-                filters_applied=filters_applied if filters_applied else None
-            )
-            logger.error(f"Dönüşüm başarısız: {job_id} — {result.get('stderr')}")
-
-    except Exception as e:
-        logger.error(f"Dönüşüm hatası: {job_id} — {str(e)}")
-        firebase_service.update_conversion_status(
-            log_id=job_id,
-            status="failed",
-            error_message=str(e)
-        )
-
-    finally:
-        # Geçici dizini temizle
-        if os.path.exists(workdir):
-            shutil.rmtree(workdir, ignore_errors=True)
-
 
 # =============================================
 # API ROTLARI
 # =============================================
 
+MOCK_LOGS: Dict[str, Any] = {}
+
 @api_router.get("/health")
 async def health_check():
-    """Sağlık kontrolü — worker, pandoc ve Firebase durumunu doğrular."""
+    """Sağlık kontrolü — worker ve pandoc durumunu doğrular."""
     pandoc_available = shutil.which("pandoc") is not None
-    firebase_available = firebase_service.check_connectivity()
 
-    overall_status = "healthy" if pandoc_available and firebase_available else "degraded"
+    overall_status = "healthy" if pandoc_available else "degraded"
 
     return {
         "status": overall_status,
         "pandoc_available": pandoc_available,
-        "firebase_available": firebase_available,
         "auth_required": settings.worker_require_auth,
         "version": "0.1.0"
     }
@@ -624,98 +284,7 @@ async def list_formats():
     }
 
 
-@api_router.post("/convert", response_model=ConversionResponse)
-@rate_limit("5/minute")
-async def start_conversion(
-    request: Request,
-    payload: ConversionRequest,
-    background_tasks: BackgroundTasks,
-    auth_ctx: Dict[str, Any] = Depends(verify_access_token)
-):
-    """
-    Yeni bir dönüşüm işlemi başlatır.
-    İşlem arka planda asenkron olarak çalışır.
-    """
-    _ = request
-
-    # Disk alanını kontrol et
-    verify_free_disk_space()
-
-    # Firebase token kullanılıyorsa istek user_id ile token uid eşleşmesini doğrula
-    if auth_ctx.get("provider") == "firebase" and payload.user_id != auth_ctx.get("uid"):
-        raise HTTPException(status_code=403, detail="user_id ile token UID eşleşmiyor")
-
-    # Conversion log oluştur
-    job_id = firebase_service.create_conversion_log(
-        project_id=payload.project_id,
-        user_id=payload.user_id,
-        input_format=payload.input_format or "auto",
-        output_format=payload.output_format.value if isinstance(payload.output_format, OutputFormat) else str(payload.output_format),
-        engine=payload.engine
-    )
-
-    if not job_id:
-        raise HTTPException(status_code=500, detail="Dönüşüm log kaydı oluşturulamadı")
-
-    # Geçici çalışma dizini oluştur
-    workdir = os.path.join(settings.worker_temp_dir, str(job_id))
-    os.makedirs(workdir, exist_ok=True)
-
-    # Arka plan görevi olarak başlat
-    background_tasks.add_task(run_conversion, payload, job_id, workdir)
-
-    return ConversionResponse(
-        job_id=job_id,
-        status="pending",
-        message="Dönüşüm işlemi başlatıldı. Durumu /status/{job_id} ile takip edebilirsiniz."
-    )
-
-
-@api_router.get("/status/{job_id}", response_model=ConversionStatus)
-@rate_limit("20/minute")
-async def get_conversion_status(
-    http_request: Request,
-    job_id: str,
-    auth_ctx: Dict[str, Any] = Depends(verify_access_token)
-):
-    """Dönüşüm işleminin durumunu sorgular. Bulut URL'si yoksa otomatik yerel statik sunumu hedefler."""
-    _ = http_request
-    log = firebase_service.get_conversion_log(job_id)
-
-    if not log:
-        raise HTTPException(status_code=404, detail="Dönüşüm kaydı bulunamadı")
-
-    if auth_ctx.get("provider") == "firebase" and log.get("user_id") != auth_ctx.get("uid"):
-        raise HTTPException(status_code=403, detail="Bu dönüşüm kaydına erişim izniniz yok")
-
-    # Çıktı URL'si (tamamlandıysa)
-    output_url = log.get("output_url")
-    if log.get("status") == "completed" and not output_url:
-        if log.get("output_document_id"):
-            docs = firebase_service.get_project_documents(log["project_id"], "output")
-            output_doc = next((d for d in docs if d["id"] == log["output_document_id"]), None)
-            if output_doc:
-                output_url = firebase_service.create_signed_url(output_doc["storage_path"])
-
-        # Yerel Sandbox Fallback: Eğer Firebase URL yoksa diskte dosyayı ara ve sun
-        if not output_url:
-            workdir = os.path.join(settings.worker_temp_dir, str(job_id))
-            if os.path.exists(workdir):
-                files = [f for f in os.listdir(workdir) if f.startswith("compiled_output") or "_output" in f]
-                if files:
-                    output_url = f"{settings.worker_api_url}/outputs/{job_id}/{files[0]}"
-
-    return ConversionStatus(
-        job_id=job_id,
-        status=log["status"],
-        input_format=log.get("input_format"),
-        output_format=log.get("output_format"),
-        engine_used=log.get("engine_used"),
-        execution_time_ms=log.get("execution_time_ms"),
-        error_message=log.get("error_message"),
-        output_url=output_url,
-        command_executed=log.get("command_executed")
-    )
+# convert ve status asenkron rotaları Firebase kaldırıldığı için devre dışı bırakılmıştır.
 
 
 @api_router.post("/convert-direct", response_model=ConversionStatus)
@@ -843,7 +412,7 @@ async def convert_direct(
             output_url = f"{settings.worker_api_url}/outputs/{job_id}/{output_filename}"
 
             # Log loglarını yerel cache'e kaydet (durum sorguları için)
-            firebase_service._mock_logs[job_id] = {
+            MOCK_LOGS[job_id] = {
                 "project_id": "direct",
                 "user_id": auth_ctx.get("uid", "direct"),
                 "input_format": input_format,

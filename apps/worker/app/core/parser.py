@@ -97,7 +97,7 @@ class DocumentParser:
             return None
 
     @staticmethod
-    def extract_yaml_metadata(file_path: str) -> Dict[str, Any]:
+    def extract_yaml_metadata(file_path: str, content: Optional[str] = None) -> Dict[str, Any]:
         """
         ReDoS (Regex Denial of Service) zafiyetlerinden arındırılmış, 
         yüksek hızlı satır bazlı YAML front-matter ayrıştırıcısı.
@@ -105,11 +105,14 @@ class DocumentParser:
         metadata: Dict[str, Any] = {}
 
         try:
-            if not os.path.exists(file_path):
-                return metadata
-
-            with open(file_path, "r", encoding="utf-8", errors="ignore") as f:
-                lines = f.readlines()
+            lines = None
+            if content is not None:
+                lines = content.splitlines()
+            else:
+                if not os.path.exists(file_path):
+                    return metadata
+                with open(file_path, "r", encoding="utf-8", errors="ignore") as f:
+                    lines = f.readlines()
 
             if not lines:
                 return metadata
@@ -140,7 +143,7 @@ class DocumentParser:
         return metadata
 
     @staticmethod
-    def analyze_content(file_path: str) -> Dict[str, Any]:
+    def analyze_content(file_path: str, content: Optional[str] = None) -> Dict[str, Any]:
         """
         ReDoS ve katlanarak artan zaman karmaşıklıklarından (backtracking) kaçınmak üzere 
         lineer O(N) zaman karmaşıklığıyla doküman içeriğini analiz eder.
@@ -158,11 +161,11 @@ class DocumentParser:
         }
 
         try:
-            if not os.path.exists(file_path):
-                return analysis
-
-            with open(file_path, "r", encoding="utf-8", errors="ignore") as f:
-                content = f.read()
+            if content is None:
+                if not os.path.exists(file_path):
+                    return analysis
+                with open(file_path, "r", encoding="utf-8", errors="ignore") as f:
+                    content = f.read()
 
             if not content:
                 return analysis

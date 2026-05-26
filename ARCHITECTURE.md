@@ -27,27 +27,26 @@ Sistem, istemci tarafındaki zengin düzenleyici bileşenleri ile sunucu tarafı
                                                          |
                          +-------------------------------+-------------------------------+
                          |                                                               |
-                [ BULUT MODU ]                                                  [ SANDBOX MODU ]
-  +---------------------------------------------+                +---------------------------------------------+
-  |              Firebase Servisleri            |                |          Lokal Sandbox Çözümleri            |
-  |  - Firestore: Kalıcı Loglar ve İş Akışları  |                |  - Bellek İçi SQLite/Dict Mock Veri Tabanı   |
-  |  - Cloud Storage: Bulut Dosya Transferleri   |                |  - Lokal Disk Çıktı Sunucusu (/outputs)     |
-  |  - Firebase SDK Token Kimlik Doğrulama      |                |  - Otomatik sandbox-user Rol Ataması         |
-  +---------------------------------------------+                +---------------------------------------------+
+                                       [ LOKAL SANDBOX MODU ]
+                         +---------------------------------------------+
+                         |          Gizlilik Odaklı Lokal Çözüm        |
+                         |  - Bellek İçi SQLite/Sözlük Mock Veri Kaydı |
+                         |  - Lokal Disk Çıktı Sunucusu (/outputs/*)   |
+                         |  - Kimlik Doğrulamasız Serbest Erişim Modeli |
 ```
 
 ---
 
-## 2. Sıfır-Konfigürasyon Lokal Sandbox Modu (Zero-Config Local Sandbox Mode)
+## 2. Gizlilik Odaklı Lokal Sandbox Modu (Privacy-First Local Sandbox Mode)
 
-Platform, yerel geliştirici deneyimini en üst düzeye çıkarmak amacıyla, bulut bağımlılıkları olmadan tek tıkla çalışabilen akıllı bir **Sandbox Modu** içerir:
+Platform, kullanıcı gizliliğini en üst düzeyde korumak ve sıfır sunucu maliyetiyle çalışmak amacıyla, bulut bağımlılıkları olmadan doğrudan çalışan akıllı bir **Lokal Sandbox Modu** kullanır:
 
 1. **Dinamik Kimlik Doğrulama Bypass Katmanı** (`verify_access_token`):
-   Lokal çalışmada `firebase-service-account.json` dosyası bulunamadığında sistem otomatik olarak yerel sandbox durumuna geçer. Gelen isteklerde yer alan ve standart Firebase doğrulamalarından geçemeyen istemci token'ları engellenmek yerine otomatik olarak `{"uid": "sandbox-user", "provider": "sandbox"}` kullanıcı kimliği ile sisteme kabul edilir. Bu sayede 401 ve 503 yetkilendirme hataları tamamen engellenir.
-2. **Bellek İçi Mock Veri Katmanı** (`FirebaseService`):
-   Veritabanı işlemleri Firestore yerine bellek içi geçici sözlükler (`self._mock_logs` ve `self._mock_documents`) üzerinden taklit edilir.
-3. **Statik Lokal Çıktı Sunucusu** (`/outputs/*`):
-   Bulut depolama alanına erişilemediğinde derlenen tüm dokümanlar geçici olarak lokal disk üzerindeki `temp_workdir` dizininde saklanır ve FastAPI statik dosya sunucusu aracılığıyla `/outputs/{job_id}/{file_name}` adresi üzerinden anında indirilebilir ve önizlenebilir hale getirilir.
+   Çevre değişkenlerinde kimlik doğrulama gereksinimi kapalı olduğunda (`WORKER_REQUIRE_AUTH=False`), tüm istemci istekleri doğrudan "sandbox-user" (misafir kullanıcı) kimliği ile sisteme kabul edilir. Bu sayede üyelik veya giriş yapma zorunluluğu olmadan herkes derleme motoruna anında erişebilir.
+2. **Bellek İçi Mock Veri Katmanı**:
+   Veritabanı işlemleri veya log kayıtları kalıcı disk veya bulut depolama yerine bellek içi geçici sözlükler (`MOCK_LOGS`) üzerinden simüle edilir. Hiçbir hassas veri veya doküman veritabanına kaydedilmez.
+3. **Statik Lokal Çıktı Sunucusu ve Otomatik Temizlik** (`/outputs/*`):
+   Derlenen tüm dokümanlar geçici olarak lokal disk üzerindeki `temp_workdir` dizininde saklanır ve FastAPI statik dosya sunucusu aracılığıyla `/outputs/{job_id}/{file_name}` adresi üzerinden anında indirilebilir ve önizlenebilir hale getirilir. 30 dakikalık zaman aşımına uğrayan tüm dosyalar arka planda otomatik olarak diskten tamamen silinir.
 
 ---
 
@@ -56,11 +55,9 @@ Platform, yerel geliştirici deneyimini en üst düzeye çıkarmak amacıyla, bu
 Geriye dönük uyumluluğu korumak ve gelecekteki API genişletmelerine hazırlıklı olmak amacıyla, işçi (worker) servis mimarisindeki yönlendirme sistemi iki katmanlı olarak tasarlanmıştır:
 
 - **Sürümlü Yönlendirme (`/api/v1`)**:
-  Yeni geliştirilen ve tarayıcı istemcilerinin kullandığı tüm modern API uç noktaları `/api/v1` önekiyle (`APIRouter` aracılığıyla) tanımlanmıştır:
+  Tarayıcı istemcilerinin kullandığı tüm modern API uç noktaları `/api/v1` önekiyle (`APIRouter` aracılığıyla) tanımlanmıştır:
   - `GET /api/v1/health` - Sistem durum analizi ve kurulu dönüştürme motorlarının tespiti.
-  - `POST /api/v1/convert-direct` - Firebase bağımlılığı olmadan doğrudan ham metin veya dosya dönüştürme.
-  - `POST /api/v1/convert` - Asenkron kuyruk tabanlı bulut dönüştürme süreci.
-  - `GET /api/v1/status/{job_id}` - Asenkron dönüştürme durumunun sorgulanması.
+  - `POST /api/v1/convert-direct` - Doğrudan ve anında ham metin veya dosya dönüştürme.
 - **Kök Yönlendirme (`/`)**:
   Eski entegrasyonlar ve CLI betiklerinin kesintisiz çalışabilmesi amacıyla, tüm yönlendirmeler aynı zamanda kök `/` dizinine de yönlendirilir.
 
@@ -140,11 +137,7 @@ sequenceDiagram
     Web->>Web: getWorkerAuthToken() ile token hazırlar (change-me veya local)
     Web->>API: POST /api/v1/convert-direct (Headers: Bearer, Form-Data)
     Note over API: verify_access_token tetiklenir
-    alt Firebase Credentials Yok (Sandbox Modu)
-        API->>API: 503/401 fırlatmak yerine sandbox-user context'i oluşturur
-    else Firebase Credentials Var
-        API->>API: Firebase Token doğrulamasını gerçekleştirir
-    end
+    API->>API: sandbox-user context'i oluşturur (Auth Bypass)
     API->>Disk: verify_free_disk_space() ile boş alanı kontrol eder
     Note over Disk: Disk Boş Alan >= 100MB?
     Disk-->>API: Disk alanı yeterli (Onaylandı)
