@@ -267,7 +267,7 @@ async def list_formats():
 @api_router.post("/convert-direct", response_model=ConversionStatus)
 @rate_limit("10/minute")
 async def convert_direct(
-    http_request: Request,
+    request: Request,
     text: Optional[str] = Form(default=None),
     file: Optional[UploadFile] = File(default=None),
     output_format: OutputFormat = Form(default=OutputFormat.PDF),
@@ -286,7 +286,7 @@ async def convert_direct(
     Doğrudan dosya veya ham metin dönüştürme gerçekleştirir.
     Sonuçlar FastAPI statik dosya sunucusu üzerinden anında indirilebilir ve önizlenebilir.
     """
-    _ = http_request
+    _ = request
 
     # Disk alanını kontrol et
     verify_free_disk_space()
@@ -432,7 +432,7 @@ async def convert_direct(
 @api_router.post("/analyze")
 @rate_limit("10/minute")
 async def analyze_document(
-    http_request: Request,
+    request: Request,
     file: UploadFile = File(...),
     target_format: OutputFormat = Form(default=OutputFormat.PDF),
 ):
@@ -440,7 +440,7 @@ async def analyze_document(
     Yüklenen dokümanı analiz eder ve önerilen dönüşüm seçeneklerini döndürür.
     Dosya kalıcı olarak saklanmaz, sadece analiz için geçici olarak işlenir.
     """
-    _ = http_request
+    _ = request
 
     # Geçici dosya oluştur
     workdir = os.path.join(settings.worker_temp_dir, f"analyze_{uuid.uuid4().hex[:8]}")
