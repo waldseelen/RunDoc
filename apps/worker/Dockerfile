@@ -4,12 +4,12 @@ FROM python:3.11-slim-bullseye
 ENV DEBIAN_FRONTEND=noninteractive \
     PYTHONUNBUFFERED=1 \
     PYTHONPATH=/app \
-    LANG=en_US.UTF-8 \
-    LC_ALL=en_US.UTF-8
+    LANG=C.UTF-8 \
+    LC_ALL=C.UTF-8
 
 WORKDIR /app
 
-# 1. Install system utilities, fonts, and curated lightweight TeX Live packages
+# 1. Install system utilities, fonts, and dependencies
 RUN apt-get update && apt-get install -y --no-install-recommends \
     wget \
     curl \
@@ -21,13 +21,6 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     fonts-liberation \
     fonts-dejavu \
     fonts-noto \
-    locales \
-    # Curated LaTeX packages (Essential for XeLaTeX without 5GB image size)
-    texlive-xetex \
-    texlive-latex-recommended \
-    texlive-latex-extra \
-    texlive-fonts-recommended \
-    texlive-plain-generic \
     # Image processing tools
     ghostscript \
     imagemagick \
@@ -42,8 +35,6 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     npm \
     chromium \
     chromium-driver \
-    && echo "en_US.UTF-8 UTF-8" > /etc/locale.gen \
-    && locale-gen \
     && rm -rf /var/lib/apt/lists/*
 
 # 2. Modify ImageMagick policy to allow PDF read/write operations (Essential for previews)
