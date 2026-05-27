@@ -278,7 +278,9 @@ export default function WorkspacePage() {
               >
                 <option value="typst">Typst</option>
                 <option value="xelatex">XeLaTeX</option>
+                <option value="tectonic">Tectonic</option>
                 <option value="weasyprint">WeasyPrint</option>
+                <option value="pagedjs-cli">Paged.js</option>
               </select>
             </div>
           )}

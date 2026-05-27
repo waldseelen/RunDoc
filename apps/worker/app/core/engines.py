@@ -192,7 +192,7 @@ class EngineRouter:
         Returns:
             Engine name veya None (HTML çıkışına fallback yapılmalı)
         """
-        fallback_order = ["xelatex", "pdflatex", "lualatex", "tectonic", "typst", "weasyprint"]
+        fallback_order = ["xelatex", "pdflatex", "lualatex", "tectonic", "typst", "weasyprint", "pagedjs-cli"]
 
         if preferred and cls.check_engine_availability(preferred):
             return preferred
