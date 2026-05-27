@@ -65,6 +65,7 @@ export default function WorkspacePage() {
   const [outputFormat, setOutputFormat] = useState("pdf");
   const [conversionState, setConversionState] = useState<ConversionState>("idle");
   const [outputUrl, setOutputUrl] = useState<string | null>(null);
+  const [previewBlobUrl, setPreviewBlobUrl] = useState<string | null>(null);
   const [errorMessage, setErrorMessage] = useState("");
   const [executionTimeMs, setExecutionTimeMs] = useState<number | undefined>(undefined);
   const [progress, setProgress] = useState(0);
@@ -106,6 +107,11 @@ export default function WorkspacePage() {
     setConversionState("converting");
     setErrorMessage("");
     setOutputUrl(null);
+    // Revoke old blob URL to free memory
+    setPreviewBlobUrl((prev) => {
+      if (prev) URL.revokeObjectURL(prev);
+      return null;
+    });
     setExecutionTimeMs(undefined);
 
     const progressInterval = startProgress();
@@ -152,6 +158,16 @@ export default function WorkspacePage() {
         setConversionState("completed");
         setOutputUrl(result.output_url);
         setExecutionTimeMs(result.execution_time_ms);
+        // Fetch output as blob for CORS-safe iframe preview
+        try {
+          const blobRes = await fetch(result.output_url);
+          if (blobRes.ok) {
+            const blob = await blobRes.blob();
+            setPreviewBlobUrl(URL.createObjectURL(blob));
+          }
+        } catch {
+          // Preview fetch failed — download link still works
+        }
       } else {
         setConversionState("failed");
         setErrorMessage(result.error_message || "Derleme hatası oluştu.");
@@ -513,9 +529,9 @@ export default function WorkspacePage() {
                   </a>
                 </div>
 
-                {canPreview ? (
+                {canPreview && previewBlobUrl ? (
                   <iframe
-                    src={outputUrl}
+                    src={previewBlobUrl}
                     className="w-full flex-1 border-0 bg-white"
                     title="Document Preview"
                     sandbox="allow-scripts allow-same-origin"
