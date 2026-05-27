@@ -192,9 +192,18 @@ def verify_free_disk_space(required_mb: int = 100):
             detail=f"Sistemde yeterli disk alanı yok. Gereken: {required_mb}MB, Mevcut: {free_mb:.1f}MB"
         )
 
-# Mount Local Converted Outputs Static Folder for Zero-Config Preview & Downloads
+class CORSStaticFiles(StaticFiles):
+    """Custom StaticFiles subclass to add CORS headers to served files."""
+    async def get_response(self, path: str, scope) -> Any:
+        response = await super().get_response(path, scope)
+        response.headers["Access-Control-Allow-Origin"] = "*"
+        response.headers["Access-Control-Allow-Methods"] = "GET, OPTIONS"
+        response.headers["Access-Control-Allow-Headers"] = "*"
+        return response
+
+# Mount Local Converted Outputs Static Folder with CORS headers enabled
 os.makedirs(settings.worker_temp_dir, exist_ok=True)
-app.mount("/outputs", StaticFiles(directory=settings.worker_temp_dir), name="outputs")
+app.mount("/outputs", CORSStaticFiles(directory=settings.worker_temp_dir), name="outputs")
 
 
 
@@ -380,8 +389,8 @@ async def convert_direct(
             media_dir = os.path.join(workdir, "extracted_media")
             builder.extract_media(media_dir)
 
-        # Eşzamanlı (synchronous) derleme ile anında yüksek hızda tepki
-        result = builder.execute()
+        # Asenkron (asyncio.to_thread) derleme ile event loop bloklanmasını engelle
+        result = await asyncio.to_thread(builder.execute)
 
         if result["status"] == "success" and os.path.exists(output_local):
             output_url = f"{settings.worker_api_url}/outputs/{job_id}/{output_filename}"

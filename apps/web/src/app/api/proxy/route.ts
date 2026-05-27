@@ -13,10 +13,16 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ error: "Missing url parameter" }, { status: 400 });
   }
 
-  // Only allow proxying requests to the configured worker
+  // Only allow proxying requests to the configured worker's domain
   const allowedOrigin = process.env.NEXT_PUBLIC_WORKER_API_URL || "http://localhost:8000";
-  if (!url.startsWith(allowedOrigin)) {
-    return NextResponse.json({ error: "Forbidden: URL not allowed" }, { status: 403 });
+  try {
+    const allowedUrl = new URL(allowedOrigin);
+    const targetUrl = new URL(url);
+    if (allowedUrl.hostname !== targetUrl.hostname) {
+      return NextResponse.json({ error: "Forbidden: URL not allowed" }, { status: 403 });
+    }
+  } catch (err) {
+    return NextResponse.json({ error: "Invalid URL format" }, { status: 400 });
   }
 
   try {

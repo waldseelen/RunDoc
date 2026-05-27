@@ -33,3 +33,5 @@ supabase/.temp
 # Temp
 /tmp/
 *.tmp
+
+.vercel

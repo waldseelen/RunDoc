@@ -69,6 +69,7 @@ export default function WorkspacePage() {
   const [errorMessage, setErrorMessage] = useState("");
   const [executionTimeMs, setExecutionTimeMs] = useState<number | undefined>(undefined);
   const [progress, setProgress] = useState(0);
+  const [isSlow, setIsSlow] = useState(false);
 
   // Advanced options (Now inline)
   const [engine, setEngine] = useState("typst");
@@ -109,8 +110,12 @@ export default function WorkspacePage() {
     setOutputUrl(null);
     setPreviewUrl(null);
     setExecutionTimeMs(undefined);
+    setIsSlow(false);
 
     const progressInterval = startProgress();
+    const slowTimer = setTimeout(() => {
+      setIsSlow(true);
+    }, 8000);
 
     try {
       const formData = new FormData();
@@ -142,6 +147,8 @@ export default function WorkspacePage() {
       });
 
       clearInterval(progressInterval);
+      clearTimeout(slowTimer);
+      setIsSlow(false);
 
       if (!response.ok) {
         const errText = await response.text();
@@ -164,6 +171,8 @@ export default function WorkspacePage() {
       }
     } catch (err: unknown) {
       clearInterval(progressInterval);
+      clearTimeout(slowTimer);
+      setIsSlow(false);
       setConversionState("failed");
       const message = err instanceof Error ? err.message : "Bağlantı hatası: Python worker ayakta mı?";
       setErrorMessage(message);
@@ -504,6 +513,13 @@ export default function WorkspacePage() {
                 <p className="text-sm font-medium tracking-wide animate-pulse">
                   {language === "tr" ? "Derleniyor..." : "Compiling..."}
                 </p>
+                {isSlow && (
+                  <p className="text-xs text-[var(--foreground-muted)] max-w-xs text-center leading-relaxed animate-fade-in border border-[var(--border)] bg-[var(--surface)] px-3 py-2 rounded-md mt-2 shadow-sm">
+                    {language === "tr" 
+                      ? "Render sunucusu uyanıyor olabilir (soğuk başlangıç), bu işlem 1 dakikaya kadar sürebilir..." 
+                      : "The Render server might be waking up (cold start), this could take up to a minute..."}
+                  </p>
+                )}
               </div>
             )}
 

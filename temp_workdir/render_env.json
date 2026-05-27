@@ -1,0 +1,10 @@
+[
+  {
+    "key": "WORKER_API_URL",
+    "value": "https://rundoc-worker.onrender.com"
+  },
+  {
+    "key": "ALLOWED_ORIGINS",
+    "value": "https://rundoc.vercel.app,https://rundoc-iuijtizoo-waldseelens-projects.vercel.app,http://localhost:3000"
+  }
+]
