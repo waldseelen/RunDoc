@@ -23,11 +23,16 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     fonts-noto \
     locales \
     # Curated LaTeX packages for PDF generation
-    texlive-xetex \
+    texlive-latex-base \
     texlive-latex-recommended \
     texlive-latex-extra \
     texlive-fonts-recommended \
+    texlive-fonts-extra \
     texlive-plain-generic \
+    texlive-xetex \
+    texlive-luatex \
+    lmodern \
+    cm-super \
     # Image processing tools
     ghostscript \
     imagemagick \
