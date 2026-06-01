@@ -153,8 +153,6 @@ class EngineRouter:
                     is_available = True
                     logger.info(f"LaTeX motoru bulundu: {engine_name} ({path / binary})")
                     break
-        
-        engine.is_available = is_available
 
         if not is_available:
             logger.warning(f"Motor bulunamadı: {engine_name} (binary: {binary})")
@@ -166,8 +164,7 @@ class EngineRouter:
         """Sistemde kullanılabilir PDF motorlarını döndürür."""
         available = []
         for name, engine in cls.PDF_ENGINES.items():
-            engine.is_available = cls.check_engine_availability(name)
-            if engine.is_available:
+            if cls.check_engine_availability(name):
                 available.append(engine)
         return available
 
@@ -176,8 +173,7 @@ class EngineRouter:
         """Sistemde kullanılabilir slayt motorlarını döndürür."""
         available = []
         for name, engine in cls.SLIDE_ENGINES.items():
-            engine.is_available = cls.check_engine_availability(name)
-            if engine.is_available:
+            if cls.check_engine_availability(name):
                 available.append(engine)
         return available
 
@@ -235,19 +231,19 @@ class EngineRouter:
         result = {"pdf_engines": {}, "slide_engines": {}}
 
         for name, engine in cls.PDF_ENGINES.items():
-            engine.is_available = cls.check_engine_availability(name)
+            available = cls.check_engine_availability(name)
             result["pdf_engines"][name] = {
                 "display_name": engine.display_name,
                 "description": engine.description,
-                "available": engine.is_available
+                "available": available
             }
 
         for name, engine in cls.SLIDE_ENGINES.items():
-            engine.is_available = cls.check_engine_availability(name)
+            available = cls.check_engine_availability(name)
             result["slide_engines"][name] = {
                 "display_name": engine.display_name,
                 "description": engine.description,
-                "available": engine.is_available
+                "available": available
             }
 
         return result

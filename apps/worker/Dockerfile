@@ -21,6 +21,13 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     fonts-liberation \
     fonts-dejavu \
     fonts-noto \
+    locales \
+    # Curated LaTeX packages for PDF generation
+    texlive-xetex \
+    texlive-latex-recommended \
+    texlive-latex-extra \
+    texlive-fonts-recommended \
+    texlive-plain-generic \
     # Image processing tools
     ghostscript \
     imagemagick \
@@ -35,6 +42,8 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     npm \
     chromium \
     chromium-driver \
+    && echo "en_US.UTF-8 UTF-8" > /etc/locale.gen \
+    && locale-gen \
     && rm -rf /var/lib/apt/lists/*
 
 # 2. Modify ImageMagick policy to allow PDF read/write operations (Essential for previews)
