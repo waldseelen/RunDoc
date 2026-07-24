@@ -1,7 +1,9 @@
 ```markdown
-# Yapay Zeka Ajanı (Agent) Teknik Tasarım Dokümanı: Pandoc Orchestrator
+# Yapay Zeka Ajanı (Agent) Teknik Tasarım Dokümanı: RunDoc (Pandoc Orchestrator motoru)
 
 Bu doküman, Pandoc'un tüm çapraz çeviri, filtreleme ve şablonlama yeteneklerini otomatize eden, Next.js ve Python (FastAPI) mimarisiyle çalışan yapay zeka ajanının (Agent) sistem mimarisini ve çalışma prensiplerini kapsamaktadır.
+
+> **Not:** Bu ajan katmanı (`apps/worker/app/agent/`) deneyseldir ve mevcut `POST /api/v1/convert-direct` canlı dönüştürme yoluna henüz bağlı değildir. Canlı yol doğrudan `DocumentParser → PandocCommandBuilder → EngineRouter` bileşenlerini kullanır. Aşağıdaki tasarım hedeflenen ajan mimarisini tanımlar.
 
 ---
 
@@ -13,17 +15,18 @@ Ajan, kullanıcıdan gelen doğal dil talimatlarını, yapılandırılmamış gi
 
 ## 2. Sistem Mimarisi ve Veri Akışı
 
-Ajan, stateless bir yürütme motoru (Python Worker) ile stateful bir yönetim arayüzü (Next.js & Supabase) arasında bir köprü görevi görür.
+Ajan, stateless bir yürütme motoru (Python Worker) ile stateless, anonim bir web arayüzü (Next.js) arasında bir köprü görevi görür. Sistemde kalıcı veritabanı veya bulut depolama (ör. Supabase) **yoktur**; tüm veri gizlilik odaklı ephemeral modelde tutulur (geçici disk klasörleri + bellek içi `MOCK_LOGS` sözlüğü).
 
 
 ```
 
-[Kullanıcı Arayüzü: Next.js] ---> [Orkestrasyon Katmanı: Next.js API & Supabase]
+[Kullanıcı Arayüzü: Next.js] ---> [FastAPI Worker /api/v1 (Anonim, Auth Yok)]
 |
 v
 [İzole Docker Konteyneri] <------- [Ajan Karar Motoru: Python FastAPI]
 ├── Pandoc CLI & Lua/Python AST Filtreleri
-└── TeX Live, Typst, WeasyPrint Motorları
+├── TeX Live, Typst, WeasyPrint Motorları
+└── Ephemeral /outputs statik sunucusu (30 dk sonra otomatik silinir)
 
 ```
 
@@ -90,7 +93,7 @@ CMD ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8000"]
 2. **Strateji Belirleme (Planning):** Çıktı formatına göre (PDF, HTML Slayt, DOCX) kullanılacak motor (`typst`, `xelatex`, `reveal.js`) ve tipografik kurallar (`--smart`) belirlenir.
 3. **Yürütme ve Güvenlik (Execution):** Komut, izole Docker ortamında, belirlenen CPU/RAM sınırları dahilinde çalıştırılır. Harici filtreler izole edilir.
 4. **Hata Yakalama ve İyileştirme (Error Recovery):** Eğer LaTeX derleme hatası (`missing font`, `undefined control sequence`) alınırsa, ajan hata logunu parse eder, eksik parametreyi veya font eşleşmesini düzeltip dönüşümü otomatik olarak yeniden dener.
-5. **Teslimat (Delivery):** Çıktı dosyası ve ayıklanan medya varlıkları Supabase Storage'a aktarılarak Next.js arayüzüne indirme bağlantısı döndürülür.
+5. **Teslimat (Delivery):** Çıktı dosyası ve ayıklanan medya varlıkları worker'ın yerel `temp_workdir/{uuid}` klasörüne yazılır ve `/outputs/{uuid}/...` statik sunucusu üzerinden Next.js arayüzüne indirme/önizleme bağlantısı (`output_url`) döndürülür. Dosyalar 30 dakika sonra otomatik silinir; kalıcı depolama kullanılmaz.
 
 ```
 

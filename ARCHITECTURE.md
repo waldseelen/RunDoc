@@ -1,6 +1,6 @@
 # 🏛️ Sistem Mimarisi ve Teknik Tasarım Dokümanı
 
-Bu doküman, **RunDoc** platformunun Next.js (Frontend) ve Python FastAPI (Worker) mimarisini, gizlilik odaklı tasarım kararlarını, API yapısını ve veri akış şemalarını tanımlar.
+Bu doküman, **RunDoc** platformunun (dönüştürme çekirdeği: **Pandoc Orchestrator** motoru) Next.js (Frontend) ve Python FastAPI (Worker) mimarisini, gizlilik odaklı tasarım kararlarını, API yapısını ve veri akış şemalarını tanımlar.
 
 ---
 
@@ -84,10 +84,11 @@ Platform, kullanıcı gizliliğini en üst düzeyde korumak ve sıfır bulut mal
 
 ## 5. Güvenli Subprocess CLI Komut Derleyicisi
 
-1. **Komut Enjeksiyonu Koruması:** `subprocess.run` ile güvenli liste yapısı, `shell=True` asla kullanılmaz
-2. **Disk Alanı Koruyucusu:** Boş alan < 100MB ise `507 Insufficient Storage` döner
-3. **Süre Kısıtları:** Her derleme maksimum 120 saniye ile sınırlı
-4. **Rate Limiting:** Her endpoint'e dakikalık istek limiti (slowapi)
+1. **Komut Enjeksiyonu Koruması:** `subprocess.run` ile güvenli liste yapısı (ör. `['pandoc', 'document.md', ...]`), `shell=True` asla kullanılmaz
+2. **Disk Alanı Koruyucusu:** Derleme öncesi `verify_free_disk_space()` çalışır; boş alan < 100MB ise `507 Insufficient Storage` döner
+3. **Süre Kısıtları:** Her derleme `WORKER_MAX_TIMEOUT` (varsayılan 120 saniye) ile sınırlı; aşılırsa işlem sonlandırılır
+4. **Rate Limiting:** Dönüştürme uç noktalarına (`/convert-direct`, `/analyze`) IP başına `10/dakika` limiti (slowapi). GET uç noktaları limitsizdir.
+5. **İstek İzleme:** Her istek `X-Request-ID` ile etiketlenir ve yanıt başlığında geri döndürülür.
 
 ---
 
